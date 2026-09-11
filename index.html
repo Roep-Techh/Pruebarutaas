@@ -44,10 +44,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Firebase solo para persistencia de calificaciones (opcional) -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-  <script src="firebase-config.js"></script>
+  <!-- Supabase, solo para guardar/leer las calificaciones (mismo proyecto
+       que usan checador/conductor/dueño; ver supabase-config.js) -->
+  <script type="module">
+    import { supabase } from './supabase-config.js';
+    window.__rssSupabase = supabase;
+  </script>
 
   <style>
     :root{
@@ -1071,16 +1073,32 @@ function renderAvgRating(ratings){
   avgText.textContent = `★ ${avg.toFixed(1)} de promedio · ${count} calificaci${count === 1 ? 'ón' : 'ones'}`;
 }
 
-if (typeof db !== 'undefined' && db) {
+// Guarda las calificaciones ya cargadas para no tener que volver a pedir
+// todo el historial cada vez que llega una nueva (a diferencia de Firebase,
+// que mandaba el nodo completo en cada cambio).
+let ratingsCargadas = [];
+
+async function cargarRatings(){
+  if (!window.__rssSupabase) return;
   try {
-    db.ref('ratings').on('value',
-      (snapshot) => {
-        const data = snapshot.val() || {};
-        renderAvgRating(Object.values(data));
-      },
-      () => { /* sin conexión */ }
-    );
-  } catch (e) { /* Firebase no configurado */ }
+    const { data, error } = await window.__rssSupabase.from('ratings').select('rating');
+    if (error) { console.error('Error cargando calificaciones:', error); return; }
+    ratingsCargadas = data || [];
+    renderAvgRating(ratingsCargadas);
+  } catch (e) { /* Supabase no disponible (sin conexión, etc.) */ }
+}
+
+if (window.__rssSupabase) {
+  cargarRatings();
+  try {
+    window.__rssSupabase
+      .channel('ratings-publico-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ratings' }, (payload) => {
+        ratingsCargadas.push(payload.new);
+        renderAvgRating(ratingsCargadas);
+      })
+      .subscribe();
+  } catch (e) { /* Supabase no configurado */ }
 }
 
 document.getElementById('ratingForm').addEventListener('submit', (e) => {
@@ -1091,7 +1109,8 @@ document.getElementById('ratingForm').addEventListener('submit', (e) => {
   const entry = {
     rating,
     route: currentRoute,
-    createdAt: Date.now(),
+    // la fecha/hora la pone la propia base (created_at default now()),
+    // así no dependemos del reloj del celular de quien califica.
   };
 
   const finish = () => {
@@ -1102,10 +1121,11 @@ document.getElementById('ratingForm').addEventListener('submit', (e) => {
     setTimeout(() => document.getElementById('ratingThanks').classList.add('hidden'), 3500);
   };
 
-  if (typeof db !== 'undefined' && db) {
-    try {
-      db.ref('ratings').push(entry).then(finish).catch(finish);
-    } catch (e) { finish(); }
+  if (window.__rssSupabase) {
+    window.__rssSupabase.from('ratings').insert(entry).then(({ error }) => {
+      if (error) console.error('Error guardando calificación:', error);
+      finish();
+    });
   } else {
     finish();
   }
