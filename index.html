@@ -1,308 +1,375 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0E80BE">
-<title>Ruta San Simón · San Simón - San Martín</title>
-<meta name="description" content="Horarios, frecuencia y mapa en vivo de la ruta de combis San Simón - San Martín Texmelucan.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0E80BE">
+  <title>Ruta San Simón · San Simón - San Martín</title>
+  <meta name="description" content="Horarios, mapa y paradas de la ruta San Simón - San Martín Texmelucan.">
 
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ruta San Simón">
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ruta San Simón">
 
-<!-- Tailwind CSS (CDN) -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          display: ['Sora', 'sans-serif'],
-          body: ['"Plus Jakarta Sans"', 'sans-serif'],
-          mono: ['"JetBrains Mono"', 'monospace'],
-        },
-        borderRadius: {
-          '4xl': '1.75rem',
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Sora', 'sans-serif'],
+            body: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          borderRadius: { '4xl': '1.75rem' }
         }
       }
     }
-  }
-</script>
+  </script>
 
-<!-- Google Fonts: Sora (display, con carácter) + Plus Jakarta Sans (texto) + JetBrains Mono (datos/horarios) -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 
-<!-- Lucide Icons (SVG, ligero, sin dependencias) -->
-<script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Firebase (para ubicación en vivo del conductor y botón de ayuda) -->
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
+  <!-- Firebase solo para persistencia de calificaciones (opcional) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
 
-<style>
-  :root{
-    /* Nivel 1 — fondo neutro cálido (no blanco puro, no slate frío) */
-    --paper:#FAF7F0;
-    --paper-2:#FFFFFF;
-    /* Nivel 3 — superficie elevada / tarjetas */
-    --surface:#F4EEDC;
-    --ink:#221B12;
-    --ink-soft:#7C7261;
-    /* Nivel 2 — acentos vivos pero con matiz (nada de plano ni neón) */
-    --talavera:#0E80BE;
-    --talavera-dark:#0A5F8E;
-    --cempasuchil:#F5900C;
-    --cempasuchil-dark:#CB7208;
-    --agave:#1E9E5A;
-    --agave-dark:#147A43;
-    --alerta:#E1483A;
-    --alerta-bg:#FCE3DE;
-    --border:#E4DBC5;
-    --shadow: 0 1px 2px rgba(34,27,18,0.05), 0 6px 16px -8px rgba(34,27,18,0.14);
-    --shadow-md: 0 10px 30px -10px rgba(34,27,18,0.22);
-  }
-  html.dark{
-    --paper:#16140F;
-    --paper-2:#1D1B14;
-    --surface:#262019;
-    --ink:#F1EBDC;
-    --ink-soft:#A79A83;
-    --talavera:#3EACEE;
-    --talavera-dark:#2088C4;
-    --cempasuchil:#FFA53D;
-    --cempasuchil-dark:#F08916;
-    --agave:#3FCB80;
-    --agave-dark:#25A863;
-    --alerta:#FF7A69;
-    --alerta-bg:#3D211D;
-    --border:rgba(255,255,255,0.08);
-    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px -10px rgba(0,0,0,0.55);
-    --shadow-md: 0 14px 34px -12px rgba(0,0,0,0.6);
-  }
+  <style>
+    :root{
+      --paper:#FAF7F0;
+      --paper-2:#FFFFFF;
+      --surface:#F4EEDC;
+      --ink:#221B12;
+      --ink-soft:#7C7261;
+      --talavera:#0E80BE;
+      --talavera-dark:#0A5F8E;
+      --cempasuchil:#F5900C;
+      --cempasuchil-dark:#CB7208;
+      --agave:#1E9E5A;
+      --agave-dark:#147A43;
+      --alerta:#E1483A;
+      --alerta-bg:#FCE3DE;
+      --border:#E4DBC5;
+      --shadow: 0 1px 2px rgba(34,27,18,0.05), 0 6px 16px -8px rgba(34,27,18,0.14);
+      --shadow-md: 0 10px 30px -10px rgba(34,27,18,0.22);
+    }
+    html.dark{
+      --paper:#16140F;
+      --paper-2:#1D1B14;
+      --surface:#262019;
+      --ink:#F1EBDC;
+      --ink-soft:#A79A83;
+      --talavera:#3EACEE;
+      --talavera-dark:#2088C4;
+      --cempasuchil:#FFA53D;
+      --cempasuchil-dark:#F08916;
+      --agave:#3FCB80;
+      --agave-dark:#25A863;
+      --alerta:#FF7A69;
+      --alerta-bg:#3D211D;
+      --border:rgba(255,255,255,0.08);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px -10px rgba(0,0,0,0.55);
+      --shadow-md: 0 14px 34px -12px rgba(0,0,0,0.6);
+    }
 
-  *{ -webkit-tap-highlight-color: transparent; }
-  html, body{ height:100%; }
-  body{
-    background:var(--paper);
-    color:var(--ink);
-    font-family:'Plus Jakarta Sans', sans-serif;
-    transition: background-color .25s ease, color .25s ease;
-    overscroll-behavior-y: contain;
-  }
-  .font-display{ font-family:'Sora', sans-serif; letter-spacing:-.01em; }
-  .font-mono{ font-family:'JetBrains Mono', monospace; }
+    *{ -webkit-tap-highlight-color: transparent; }
+    html, body{ height:100%; overflow-x:hidden; }
+    body{
+      background:var(--paper);
+      color:var(--ink);
+      font-family:'Plus Jakarta Sans', sans-serif;
+      transition: background-color .25s ease, color .25s ease;
+      overscroll-behavior-y: contain;
+      position: relative;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
 
-  /* Ribbon: la "cinta de color" que identifica cada ruta, como en las combis reales */
-  #ribbon{
-    height:6px;
-    width:100%;
-    background: var(--route-color);
-    transition: background-color .35s ease;
-  }
+    body::before{
+      content:'';
+      position:fixed;
+      inset:0;
+      z-index:-2;
+      background-image:url('fondo-route66.jpg');
+      background-size:cover;
+      background-position:center 35%;
+      background-repeat:no-repeat;
+    }
+    body::after{
+      content:'';
+      position:fixed;
+      inset:0;
+      z-index:-1;
+      background:color-mix(in srgb, var(--paper) 80%, transparent);
+      transition: background-color .25s ease;
+    }
+    .font-display{ font-family:'Sora', sans-serif; letter-spacing:-.01em; }
+    .font-mono{ font-family:'JetBrains Mono', monospace; }
 
-  /* Tarjeta base del sistema — superficie elevada, borde sutil, sombra difuminada */
-  .placard{
-    background: var(--paper-2);
-    border: 1px solid var(--border);
-    border-radius: 1.25rem;
-    box-shadow: var(--shadow);
-    transition: box-shadow .3s ease, transform .3s ease, border-color .3s ease;
-  }
-  .placard-hover:hover{
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-  }
+    #ribbon{
+      height:6px;
+      width:100%;
+      background: var(--route-color);
+      transition: background-color .35s ease;
+    }
 
-  .route-btn{
-    border: 1.5px solid var(--border);
-    background: var(--paper-2);
-    color: var(--ink-soft);
-    border-radius: 1.25rem;
-    transition: all .25s ease;
-  }
-  .route-btn:active{ transform: scale(.97); }
-  .route-btn:not(.active):hover{
-    border-color: var(--route-color);
-    color: var(--ink);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow);
-  }
-  .route-btn.active[data-route="capilla"]{
-    background: linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%);
-    border-color: var(--cempasuchil-dark);
-    color: #fff;
-    box-shadow: var(--shadow-md);
-  }
-  .route-btn.active[data-route="secundaria"]{
-    background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%);
-    border-color: var(--agave-dark);
-    color: #fff;
-    box-shadow: var(--shadow-md);
-  }
+    .placard{
+      background: color-mix(in srgb, var(--paper-2) 80%, transparent);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      box-shadow: var(--shadow);
+      transition: box-shadow .3s ease, transform .3s ease, border-color .3s ease, background-color .25s ease;
+    }
+    .placard-hover:hover{
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
 
-  .stop-row{
-    border-bottom: 1px solid var(--border);
-  }
-  .stop-row:last-child{ border-bottom:none; }
-  .stop-toggle{ transition: background-color .2s ease; }
-  .stop-toggle:hover{ background: var(--surface); }
+    .route-btn{
+      border: 1.5px solid var(--border);
+      background: color-mix(in srgb, var(--paper-2) 82%, transparent);
+      backdrop-filter: blur(12px) saturate(160%);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);
+      color: var(--ink-soft);
+      border-radius: 1.25rem;
+      transition: all .25s ease;
+    }
+    .route-btn:active{ transform: scale(.97); }
+    .route-btn:not(.active):hover{
+      border-color: var(--route-color);
+      color: var(--ink);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+    }
+    .route-btn.active[data-route="capilla"]{
+      background: linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%);
+      border-color: var(--cempasuchil-dark);
+      color: #fff;
+      box-shadow: var(--shadow-md);
+    }
+    .route-btn.active[data-route="secundaria"]{
+      background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%);
+      border-color: var(--agave-dark);
+      color: #fff;
+      box-shadow: var(--shadow-md);
+    }
 
-  .stop-panel{
-    max-height:0;
-    overflow:hidden;
-    transition: max-height .28s ease;
-  }
-  .stop-panel.open{
-    max-height: 220px;
-  }
+    .stop-row{
+      border-bottom: 1px solid var(--border);
+    }
+    .stop-row:last-child{ border-bottom:none; }
+    .stop-toggle{ transition: background-color .2s ease; }
+    .stop-toggle:hover{ background: var(--surface); }
 
-  .chevron{ transition: transform .2s ease; }
-  .chevron.open{ transform: rotate(180deg); }
+    .stop-panel{
+      max-height:0;
+      overflow:hidden;
+      transition: max-height .28s ease;
+    }
+    .stop-panel.open{
+      max-height: 220px;
+    }
 
-  #map{
-    height: 340px;
-    width:100%;
-    background:var(--paper-2);
-  }
-  .leaflet-container{ font-family:'Plus Jakarta Sans', sans-serif; background:var(--surface) !important; }
+    .chevron{ transition: transform .2s ease; }
+    .chevron.open{ transform: rotate(180deg); }
 
-  /* Micro-interacciones: botones y chips interactivos */
-  .btn-lift{ transition: all .25s cubic-bezier(.2,.8,.2,1); }
-  .btn-lift:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); }
-  .btn-lift:active{ transform: translateY(0) scale(.97); }
+    #map{
+      height: 340px;
+      width:100%;
+      background:var(--paper-2);
+    }
+    .leaflet-container{ font-family:'Plus Jakarta Sans', sans-serif; background:var(--surface) !important; }
 
-  .stop-pin{
-    width:26px; height:26px;
-    border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
-    display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 1px 3px rgba(0,0,0,.4);
-    border: 2px solid rgba(255,255,255,.85);
-  }
-  .stop-pin span{ transform: rotate(45deg); font-size:12px; }
+    .btn-lift{ transition: all .25s cubic-bezier(.2,.8,.2,1); }
+    .btn-lift:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .btn-lift:active{ transform: translateY(0) scale(.97); }
 
-  .skeleton{
-    background: linear-gradient(90deg, var(--paper-2) 25%, var(--border) 37%, var(--paper-2) 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-  @keyframes shimmer{
-    0%{ background-position: 100% 50%; }
-    100%{ background-position: 0 50%; }
-  }
+    .stop-pin{
+      width:26px; height:26px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      display:flex; align-items:center; justify-content:center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.4);
+      border: 2px solid rgba(255,255,255,.85);
+    }
+    .stop-pin span{ transform: rotate(45deg); font-size:12px; }
 
-  ::selection{ background: var(--cempasuchil); color:#fff; }
+    ::selection{ background: var(--cempasuchil); color:#fff; }
 
-  .user-dot{
-    width:18px; height:18px;
-    border-radius:50%;
-    background:#1A73E8;
-    border:3px solid #fff;
-    box-shadow: 0 0 0 2px rgba(26,115,232,.35), 0 2px 4px rgba(0,0,0,.35);
-    position:relative;
-  }
-  .user-dot::after{
-    content:'';
-    position:absolute;
-    inset:-12px;
-    border-radius:50%;
-    background:rgba(26,115,232,.25);
-    animation: userPulse 2s ease-out infinite;
-  }
-  @keyframes userPulse{
-    0%{ transform:scale(0.4); opacity:.9; }
-    100%{ transform:scale(1.6); opacity:0; }
-  }
-  #locateBtn.active{
-    background:#1A73E8 !important;
-    border-color:#1558B0 !important;
-    color:#fff !important;
-  }
+    .user-dot{
+      width:18px; height:18px;
+      border-radius:50%;
+      background:#1A73E8;
+      border:3px solid #fff;
+      box-shadow: 0 0 0 2px rgba(26,115,232,.35), 0 2px 4px rgba(0,0,0,.35);
+      position:relative;
+    }
+    .user-dot::after{
+      content:'';
+      position:absolute;
+      inset:-12px;
+      border-radius:50%;
+      background:rgba(26,115,232,.25);
+      animation: userPulse 2s ease-out infinite;
+    }
+    @keyframes userPulse{
+      0%{ transform:scale(0.4); opacity:.9; }
+      100%{ transform:scale(1.6); opacity:0; }
+    }
+    #locateBtn.active{
+      background:#1A73E8 !important;
+      border-color:#1558B0 !important;
+      color:#fff !important;
+    }
 
-  #installBtn.show{ display:flex; }
+    #installBtn.show{ display:flex; }
 
-  .combi-marker{
-    width:30px; height:30px;
-    border-radius: 50%;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 2px 6px rgba(0,0,0,.45);
-    border: 2px solid #fff;
-    font-size:16px;
-  }
-  .combi-emoji{ display:inline-block; transition: transform .15s linear; }
+    .combi-marker{
+      width:30px; height:30px;
+      border-radius: 50%;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow: 0 2px 6px rgba(0,0,0,.45);
+      border: 2px solid #fff;
+      font-size:16px;
+    }
+    .combi-emoji{ display:inline-block; transition: transform .15s linear; }
 
-  #confettiCanvas{
-    position:fixed; inset:0; width:100%; height:100%;
-    pointer-events:none; z-index:60;
-  }
+    [data-lucide]{ width:18px; height:18px; stroke-width:2.1; }
 
-  /* Combi EN VIVO (posición real mandada por el conductor vía Firebase) */
-  .live-marker{
-    width:34px; height:34px;
-    border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 2px 8px rgba(0,0,0,.5);
-    border: 3px solid #fff;
-    font-size:17px;
-    background:#2C9E4A;
-    position:relative;
-  }
-  .live-marker::after{
-    content:'';
-    position:absolute;
-    inset:-8px;
-    border-radius:50%;
-    background:rgba(44,158,74,.35);
-    animation: userPulse 1.6s ease-out infinite;
-  }
-  #liveDriverBadge{
-    position:absolute; top:2.5rem; left:0.625rem; z-index:500;
-    font-size:11px; font-weight:600; padding:5px 10px; border-radius:999px;
-    background:#2C9E4A; color:#fff; display:none; align-items:center; gap:5px;
-    box-shadow:var(--shadow); font-family:'Sora', sans-serif;
-  }
-  #liveDriverBadge.show{ display:flex; }
-  #liveDriverBadge .dot{ width:7px; height:7px; border-radius:50%; background:#fff; animation:userPulse 1.4s ease-out infinite; }
+    @media (prefers-reduced-motion: reduce){
+      *{ transition: none !important; animation: none !important; }
+      .combi-emoji{ transition:none !important; }
+    }
 
-  /* Lucide icons: tamaño consistente por defecto, heredan stroke-width fino y moderno */
-  [data-lucide]{ width:18px; height:18px; stroke-width:2.1; }
+    .rating-star{
+      font-size: 30px;
+      line-height: 1;
+      background: none;
+      border: none;
+      padding: 2px;
+      cursor: pointer;
+      color: var(--border);
+      transition: color .15s ease, transform .15s ease;
+    }
+    .rating-star:hover{ transform: scale(1.15); }
+    .rating-star:active{ transform: scale(.95); }
 
-  @media (prefers-reduced-motion: reduce){
-    *{ transition: none !important; animation: none !important; }
-    .combi-emoji{ transition:none !important; }
-  }
-</style>
+    /* Navegación inferior estilo pestañas (abajo, fija) */
+    .bottom-nav{
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 40;
+      background: color-mix(in srgb, var(--paper) 88%, transparent);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0.5rem 0.25rem;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+    .bottom-nav .tab-btn{
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 0.4rem 0.6rem;
+      font-weight: 600;
+      font-size: 0.7rem;
+      color: var(--ink-soft);
+      transition: all .2s ease;
+      font-family: 'Sora', sans-serif;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      border-radius: 0;
+    }
+    .bottom-nav .tab-btn.active{
+      color: var(--route-color);
+      border-bottom-color: var(--route-color);
+    }
+    .bottom-nav .tab-btn:active{ transform: scale(.94); }
+    .bottom-nav .tab-btn i{ width:20px; height:20px; }
+
+    .tab-content{
+      display: none;
+      animation: fadeIn .2s ease;
+    }
+    .tab-content.active{
+      display: block;
+    }
+
+    @keyframes fadeIn{
+      0%{ opacity:0; transform: translateY(6px); }
+      100%{ opacity:1; transform: translateY(0); }
+    }
+
+    /* Scroll suave para el contenido */
+    .scrollable-content{
+      max-height: calc(100vh - 140px);
+      overflow-y: auto;
+      padding-bottom: 1rem;
+      scroll-behavior: smooth;
+    }
+    .scrollable-content::-webkit-scrollbar{
+      width: 4px;
+    }
+    .scrollable-content::-webkit-scrollbar-track{
+      background: transparent;
+    }
+    .scrollable-content::-webkit-scrollbar-thumb{
+      background: var(--border);
+      border-radius: 8px;
+    }
+
+    /* Espacio para el nav inferior */
+    .pb-nav{
+      padding-bottom: 70px;
+    }
+
+    /* Indicador de que hay más pestañas */
+    .tab-hint{
+      display: inline-block;
+      animation: hintPulse 2s ease-in-out infinite;
+    }
+    @keyframes hintPulse{
+      0%, 100%{ opacity:0.6; }
+      50%{ opacity:1; }
+    }
+  </style>
 </head>
-<body class="font-body pb-10" style="--route-color:#F5900C;">
+<body class="font-body pb-nav" style="--route-color:#F5900C;">
 
-<!-- Ribbon / cinta de color -->
+<!-- Ribbon -->
 <div id="ribbon"></div>
 
 <!-- HEADER -->
-<header class="sticky top-0 z-30 backdrop-blur" style="background:color-mix(in srgb, var(--paper) 92%, transparent); border-bottom:1px solid var(--border);">
+<header class="sticky top-0 z-30 backdrop-blur" style="background:color-mix(in srgb, var(--paper) 85%, transparent); border-bottom:1px solid var(--border);">
   <div class="max-w-md mx-auto flex items-center justify-between px-4 py-3">
     <div class="flex items-center gap-2.5">
-      <button id="hornBtn" aria-label="Bocinazo de la combi" class="btn-lift w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style="background:linear-gradient(155deg, var(--talavera) 0%, var(--talavera-dark) 100%);">
-        <svg viewBox="0 0 48 32" class="w-6 h-6" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 22V13C4 10 6 8 9 8H31L40 15V22" stroke="white" stroke-width="2.6" stroke-linejoin="round"/>
-          <rect x="4" y="22" width="40" height="4" rx="1" fill="white"/>
-          <circle cx="14" cy="27" r="3.4" fill="white"/>
-          <circle cx="34" cy="27" r="3.4" fill="white"/>
-          <path d="M22 8V15H40" stroke="white" stroke-width="2.2"/>
-        </svg>
-      </button>
       <div>
         <h1 class="font-display font-semibold text-lg leading-tight flex items-center gap-1.5">
           Ruta San Simón
@@ -322,95 +389,93 @@
   </div>
 </header>
 
-<main class="max-w-md mx-auto px-4 mt-4 space-y-4">
+<!-- CONTENIDO PRINCIPAL (scrollable) -->
+<main class="max-w-md mx-auto px-4 mt-4 scrollable-content">
 
-  <!-- SELECTOR DE RAMAL -->
-  <section>
-    <div class="grid grid-cols-2 gap-3">
-      <button data-route="capilla" class="route-btn active py-4 font-display font-semibold text-[15px] leading-tight">
-        Por Capilla
-        <span class="block text-[11px] font-body font-normal opacity-90 mt-1">La Capilla · Central</span>
-      </button>
-      <button data-route="secundaria" class="route-btn py-4 font-display font-semibold text-[15px] leading-tight">
-        Por Secundaria
-        <span class="block text-[11px] font-body font-normal opacity-90 mt-1">Hacienda San José · Central</span>
-      </button>
-    </div>
-  </section>
+  <!-- TAB INICIO -->
+  <div id="tab-inicio" class="tab-content active space-y-4">
+    <!-- SELECTOR DE RAMAL -->
+    <section>
+      <div class="grid grid-cols-2 gap-3">
+        <button data-route="capilla" class="route-btn active py-4 font-display font-semibold text-[15px] leading-tight">
+          Por Capilla
+        </button>
+        <button data-route="secundaria" class="route-btn py-4 font-display font-semibold text-[15px] leading-tight">
+          Por Secundaria
+        </button>
+      </div>
+      <p class="text-[10px] text-center mt-2" style="color:var(--ink-soft); opacity:.7;">Elige el ramal que tomas normalmente</p>
+    </section>
 
-  <!-- TARJETA DE INFO RÁPIDA -->
-  <section class="placard placard-hover p-5">
-    <div class="flex items-start justify-between gap-3">
+    <!-- HORARIOS -->
+    <section class="placard placard-hover p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Primera salida</p>
+          <p class="font-mono font-bold text-2xl leading-tight mt-0.5" style="color:var(--route-color);">5:30 AM</p>
+          <p class="text-[11px] font-semibold mt-3" style="color:var(--ink-soft);">Última salida</p>
+          <p class="font-mono font-bold text-2xl leading-tight mt-0.5" style="color:var(--route-color);">9:30 PM</p>
+        </div>
+        <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style="background:color-mix(in srgb, var(--route-color) 16%, var(--paper-2)); color:var(--route-color);">
+          <i data-lucide="clock-4"></i>
+        </div>
+      </div>
+      <p class="text-[10px] mt-3" style="color:var(--ink-soft); opacity:.8;">*Horario de referencia, puede variar según el tráfico.</p>
+    </section>
+
+    <!-- TARIFAS -->
+    <section class="placard placard-hover p-5">
+      <div class="flex items-center justify-between mb-3.5">
+        <h2 class="font-display font-semibold text-sm" style="color:var(--ink-soft);">Tarifas</h2>
+        <span class="w-8 h-8 rounded-full flex items-center justify-center" style="background:color-mix(in srgb, var(--cempasuchil) 18%, var(--paper-2)); color:var(--cempasuchil);"><i data-lucide="coins" class="w-4 h-4"></i></span>
+      </div>
+      <div class="grid grid-cols-2 gap-2.5">
+        <div class="rounded-2xl p-3.5" style="background:var(--surface);">
+          <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Normal</p>
+          <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$9</p>
+          <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">San Simón → San Martín</p>
+        </div>
+        <div class="rounded-2xl p-3.5" style="background:var(--surface);">
+          <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Parada mínima</p>
+          <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$8</p>
+          <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">Tramos cortos</p>
+        </div>
+        <div class="rounded-2xl p-3.5" style="background:var(--surface);">
+          <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Estudiantes</p>
+          <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$7</p>
+          <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">Con credencial</p>
+        </div>
+        <div class="rounded-2xl p-3.5" style="background:var(--surface);">
+          <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Adulto mayor</p>
+          <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$5</p>
+          <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">INAPAM / abuelitos</p>
+        </div>
+      </div>
+      <p class="text-[10px] mt-3" style="color:var(--ink-soft); opacity:.8;">*Tarifas de referencia, pueden variar ligeramente según el operador.</p>
+      <p class="text-[11px] mt-2 flex items-center gap-1.5" style="color:var(--ink-soft);">
+        <i data-lucide="info" class="w-3.5 h-3.5 shrink-0"></i> Lunes, martes y jueves la combi llega hasta la Central (mercado).
+      </p>
+    </section>
+
+    <!-- ALERTA DE TIANGUIS -->
+    <section id="tianguisAlert" class="hidden rounded-2xl p-4 flex items-start gap-3" style="background:var(--alerta-bg); border:1px solid var(--alerta);">
+      <span class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:var(--paper-2); color:var(--alerta);"><i data-lucide="triangle-alert" class="w-4 h-4"></i></span>
       <div>
-        <p class="text-[11px] uppercase tracking-wider font-semibold" style="color:var(--ink-soft);">En este momento</p>
-        <p id="freqText" class="font-display font-bold text-2xl leading-tight mt-0.5" style="color:var(--route-color);">Calculando…</p>
-        <p id="nextDepartureText" class="font-mono text-[12px] mt-1.5" style="color:var(--ink-soft);"></p>
+        <p class="font-display font-semibold text-sm" style="color:var(--alerta);">Hoy hay tianguis en San Martín</p>
+        <p class="text-[13px] mt-0.5" style="color:var(--ink-soft);">Tráfico más lento cerca del centro. Considera 10-15 min extra en tu viaje.</p>
       </div>
-      <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style="background:color-mix(in srgb, var(--route-color) 16%, var(--paper-2)); color:var(--route-color);">
-        <i data-lucide="clock-4"></i>
-      </div>
-    </div>
+    </section>
 
-    <div class="mt-4 pt-4 grid grid-cols-2 gap-3" style="border-top:1px solid var(--border);">
-      <div>
-        <p class="text-[11px] uppercase tracking-wider font-semibold" style="color:var(--ink-soft);">Primera corrida</p>
-        <p class="font-mono font-bold text-lg mt-0.5">5:30 AM</p>
-      </div>
-      <div>
-        <p class="text-[11px] uppercase tracking-wider font-semibold" style="color:var(--ink-soft);">Última corrida</p>
-        <p class="font-mono font-bold text-lg mt-0.5">9:30 PM</p>
-      </div>
+    <!-- Mini guía de navegación -->
+    <div class="text-center text-xs py-2" style="color:var(--ink-soft); opacity:.7;">
+      <span class="tab-hint">👇 Toca abajo para ver el mapa, calificar o ver avisos</span>
     </div>
-    <p class="text-[10px] mt-3" style="color:var(--ink-soft); opacity:.8;">*Hora de próxima salida estimada, recuerde que es un aproximado.</p>
-  </section>
+  </div>
 
-  <!-- TARIFAS -->
-  <section class="placard placard-hover p-5">
-    <div class="flex items-center justify-between mb-3.5">
-      <h2 class="font-display font-semibold text-sm uppercase tracking-wide" style="color:var(--ink-soft);">Tarifas</h2>
-      <span class="w-8 h-8 rounded-full flex items-center justify-center" style="background:color-mix(in srgb, var(--cempasuchil) 18%, var(--paper-2)); color:var(--cempasuchil);"><i data-lucide="coins" class="w-4 h-4"></i></span>
-    </div>
-    <div class="grid grid-cols-2 gap-2.5">
-      <div class="rounded-2xl p-3.5" style="background:var(--surface);">
-        <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Normal</p>
-        <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$9</p>
-        <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">San Simón → San Martín</p>
-      </div>
-      <div class="rounded-2xl p-3.5" style="background:var(--surface);">
-        <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Parada mínima</p>
-        <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$8</p>
-        <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">Tramos cortos</p>
-      </div>
-      <div class="rounded-2xl p-3.5" style="background:var(--surface);">
-        <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Estudiantes</p>
-        <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$7</p>
-        <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">Con credencial</p>
-      </div>
-      <div class="rounded-2xl p-3.5" style="background:var(--surface);">
-        <p class="text-[11px] font-semibold" style="color:var(--ink-soft);">Adulto mayor</p>
-        <p class="font-mono font-bold text-xl mt-0.5" style="color:var(--route-color);">$5</p>
-        <p class="text-[10px] mt-0.5" style="color:var(--ink-soft);">INAPAM / abuelitos</p>
-      </div>
-    </div>
-    <p class="text-[10px] mt-3" style="color:var(--ink-soft); opacity:.8;">*Tarifas de referencia, pueden variar ligeramente según el operador.</p>
-    <p class="text-[11px] mt-2 flex items-center gap-1.5" style="color:var(--ink-soft);">
-      <i data-lucide="info" class="w-3.5 h-3.5 shrink-0"></i> Lunes, martes y jueves la combi llega hasta la Central (mercado).
-    </p>
-  </section>
-
-  <!-- ALERTA DE TIANGUIS -->
-  <section id="tianguisAlert" class="hidden rounded-2xl p-4 flex items-start gap-3" style="background:var(--alerta-bg); border:1px solid var(--alerta);">
-    <span class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:var(--paper-2); color:var(--alerta);"><i data-lucide="triangle-alert" class="w-4 h-4"></i></span>
-    <div>
-      <p class="font-display font-semibold text-sm" style="color:var(--alerta);">Hoy hay tianguis en San Martín</p>
-      <p class="text-[13px] mt-0.5" style="color:var(--ink-soft);">Tráfico más lento cerca del centro. Considera 10-15 min extra en tu viaje.</p>
-    </div>
-  </section>
-
-  <!-- MAPA -->
-  <section>
-    <div class="flex items-center justify-between mb-2 gap-2">
-      <h2 class="font-display font-semibold text-sm uppercase tracking-wide" style="color:var(--ink-soft);">Mapa de la ruta</h2>
+  <!-- TAB MAPA -->
+  <div id="tab-mapa" class="tab-content space-y-4">
+    <div class="flex items-center justify-between gap-2">
+      <h2 class="font-display font-semibold text-sm" style="color:var(--ink-soft);">Mapa de la ruta</h2>
       <div class="flex items-center gap-1.5">
         <button id="locateBtn" class="btn-lift text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5" style="background:var(--paper-2); border:1.5px solid var(--border); color:var(--ink-soft);">
           <i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i> Mi ubicación
@@ -419,41 +484,83 @@
       </div>
     </div>
     <div class="placard overflow-hidden relative">
-      <span id="combiDirectionBadge" class="absolute top-2.5 left-2.5 z-[500] text-[11px] font-semibold px-2.5 py-1.5 rounded-full font-display" style="background:var(--paper-2); border:1.5px solid var(--route-color); color:var(--route-color); box-shadow:var(--shadow);"></span>
+      <span id="combiDirectionBadge" class="absolute top-2.5 left-2.5 right-2.5 z-[500] text-[11px] font-semibold px-2.5 py-1.5 rounded-full font-display truncate" style="background:var(--paper-2); border:1.5px solid var(--route-color); color:var(--route-color); box-shadow:var(--shadow); max-width:calc(100% - 20px); width:fit-content;"></span>
       <div id="map"></div>
     </div>
     <p id="locateStatus" class="text-[11px] mt-1.5 hidden" style="color:var(--ink-soft);"></p>
-  </section>
 
-  <!-- ESTATUS DE LA RUTA (avisos de los conductores, sin ubicación exacta) -->
-  <section>
-    <h2 class="font-display font-semibold text-sm uppercase tracking-wide mb-2" style="color:var(--ink-soft);">Últimos avisos</h2>
-    <div id="routeEventsList" class="placard p-4 space-y-2.5">
-      <p id="routeEventsEmpty" class="text-sm text-center" style="color:var(--ink-soft);">Todavía no hay avisos de los conductores hoy.</p>
+    <!-- PARADAS (dentro del mapa para que sea más compacto) -->
+    <div>
+      <h2 class="font-display font-semibold text-sm mb-2" style="color:var(--ink-soft);">Paradas principales</h2>
+      <div id="stopsList" class="placard overflow-hidden"></div>
     </div>
-  </section>
+  </div>
 
-  <!-- PARADAS -->
-  <section>
-    <h2 class="font-display font-semibold text-sm uppercase tracking-wide mb-2" style="color:var(--ink-soft);">Paradas principales</h2>
-    <div id="stopsList" class="placard overflow-hidden"></div>
-  </section>
+  <!-- TAB CALIFICAR -->
+  <div id="tab-calificar" class="tab-content space-y-4">
+    <section class="placard placard-hover p-5">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="font-display font-semibold text-sm" style="color:var(--ink-soft);">Califica tu viaje</h2>
+        <span class="w-8 h-8 rounded-full flex items-center justify-center" style="background:color-mix(in srgb, var(--cempasuchil) 18%, var(--paper-2)); color:var(--cempasuchil);"><i data-lucide="star" class="w-4 h-4"></i></span>
+      </div>
+      <p id="avgRatingText" class="text-[12px] mb-3.5" style="color:var(--ink-soft);">Sé el primero en calificar hoy.</p>
 
-  <footer class="text-center text-[11px] pt-4 pb-6" style="color:var(--ink-soft);">
-    Horarios y frecuencias de referencia · Confirma con el operador en ruta.
-    <br class="mb-1">
-    <span class="inline-flex items-center gap-2 mt-2">
-      <a href="conductor.html" class="hover:opacity-100 transition-opacity" style="color:var(--ink-soft); text-decoration:underline; text-underline-offset:2px; opacity:.75;">.</a>
-      <span style="opacity:.4;">·</span>
-      <a href="dueno.html" class="hover:opacity-100 transition-opacity" style="color:var(--ink-soft); text-decoration:underline; text-underline-offset:2px; opacity:.75;">.</a>
-    </span>
-  </footer>
+      <form id="ratingForm" class="space-y-3.5">
+        <div>
+          <label class="block text-[11px] font-semibold mb-1.5" style="color:var(--ink-soft);">Calificación</label>
+          <div id="starContainer" class="flex gap-1"></div>
+          <input type="hidden" id="ratingValue" value="0">
+        </div>
+        <button type="submit" class="btn-lift w-full py-3 rounded-2xl font-display font-semibold text-sm flex items-center justify-center gap-2"
+                style="background:linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%); color:#fff;">
+          <i data-lucide="send" class="w-4 h-4"></i> Enviar calificación
+        </button>
+      </form>
+
+      <div id="ratingThanks" class="hidden mt-3.5 rounded-xl p-3 flex items-center gap-2.5" style="background:color-mix(in srgb, var(--agave) 14%, var(--paper-2));">
+        <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0" style="color:var(--agave-dark);"></i>
+        <p class="text-[12.5px] font-semibold" style="color:var(--agave-dark);">¡Gracias por tu calificación!</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- TAB AVISOS -->
+  <div id="tab-avisos" class="tab-content space-y-4">
+    <div class="flex items-center justify-between gap-2">
+      <h2 class="font-display font-semibold text-sm" style="color:var(--ink-soft);">Avisos de ruta</h2>
+      <span class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:color-mix(in srgb, var(--talavera) 18%, var(--paper-2)); color:var(--talavera);"><i data-lucide="megaphone" class="w-4 h-4"></i></span>
+    </div>
+
+    <div id="avisosList" class="space-y-3"></div>
+
+    <div id="avisosEmpty" class="placard p-6 text-center hidden">
+      <span class="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-3" style="background:var(--surface); color:var(--ink-soft);"><i data-lucide="megaphone" class="w-5 h-5"></i></span>
+      <p class="font-display font-semibold text-sm" style="color:var(--ink);">Sin avisos por ahora</p>
+      <p class="text-[12.5px] mt-1" style="color:var(--ink-soft);">Cuando el Dueño o el Checador publiquen un aviso, aparecerá aquí.</p>
+    </div>
+  </div>
+
 </main>
+
+<!-- NAVEGACIÓN INFERIOR (fija, abajo) -->
+<nav class="bottom-nav">
+  <button class="tab-btn active" data-tab="inicio">
+    <i data-lucide="home"></i> Inicio
+  </button>
+  <button class="tab-btn" data-tab="mapa">
+    <i data-lucide="map"></i> Mapa
+  </button>
+  <button class="tab-btn" data-tab="calificar">
+    <i data-lucide="star"></i> Calificar
+  </button>
+  <button class="tab-btn" data-tab="avisos">
+    <i data-lucide="megaphone"></i> Avisos
+  </button>
+</nav>
 
 <script>
 /* ============================================================
-   DATOS DE RUTA — reemplaza estas coordenadas con el trazado
-   GPS real de cada ramal cuando lo tengas disponible.
+   DATOS DE RUTA (Geo Tracker, 7 ago 2026)
    ============================================================ */
 
 const ROUTES = {
@@ -461,56 +568,102 @@ const ROUTES = {
     color: '#F5900C',
     colorDark: '#CB7208',
     label: 'Por Capilla',
-    // Trazado real: Av. Guadalupe Victoria → 2A de Guadalupe Victoria → Adolfo López Mateos →
-    // Tercera de Allende → C. Aldama → C. Manuel Padre Montés → Av. Sur → Calle Nacional Ote. →
-    // 16 de Septiembre → 5 de Mayo → Avenida Nte. → La Capilla, y de ahí se une al mismo
-    // tramo del ramal Secundaria (Cam. Real Iztaccíhuatl / San Salvador el Verde) hasta la Central.
     path: [
-      [19.260428, -98.475840], // Base San Simón (Av. Guadalupe Victoria)
-      [19.261700, -98.475000], // aprox. 2A de Guadalupe Victoria / Adolfo López Mateos, pendiente afinar
-      [19.263000, -98.474400], // aprox. Tercera de Allende / C. Aldama, pendiente afinar
-      [19.264300, -98.473500], // aprox. C. Manuel Padre Montés / Av. Sur, pendiente afinar
-      [19.26266319415861, -98.473783073471], // Centro de Salud y Campo Deportivo
-      [19.26503592756045, -98.47278593212418], // Iglesia San Simón y Plaza
-      [19.266500, -98.473600], // aprox. 16 de Septiembre / 5 de Mayo, pendiente afinar
-      [19.267305412889165, -98.47392478914037], // La Capilla, entrada al pueblo
-      [19.269500, -98.465000], // aprox. tramo hacia Cam. Real Iztaccíhuatl, pendiente afinar
-      [19.272046787005376, -98.46081561175298], // entrada a San Rafael Tlanalapan
-      [19.27267554685216, -98.4589748845061], // Los Arcos
-      [19.273297956240363, -98.4576530200491], // Caja de agua
-      [19.274398635598594, -98.45436098967812], // El Libramiento
-      [19.276800, -98.448500], // aprox. Cam. Real Iztaccíhuatl / San Salvador el Verde, pendiente afinar
-      [19.279387085913882, -98.44208837241015], // Módulo de vigilancia
-      [19.280500, -98.439700], // aprox. Agustín Lara / San Salvador el Verde, pendiente afinar
-      [19.28161584992344, -98.43741861590993], // Secundaria La Uno (Av. México)
-      [19.280700, -98.436000], // aprox. Av. México / Carr. Federal México-Puebla, pendiente afinar
-      [19.279755881243926, -98.43447995257797] // Central de Autobuses (AU), Carr. Internacional
+      [19.26241, -98.476966],
+      [19.262464, -98.476701],
+      [19.262588, -98.476468],
+      [19.262615, -98.47627],
+      [19.262573, -98.475727],
+      [19.262686, -98.475478],
+      [19.262626, -98.474936],
+      [19.262685, -98.474646],
+      [19.262708, -98.473869],
+      [19.262803, -98.473832],
+      [19.263925, -98.473923],
+      [19.265586, -98.473918],
+      [19.266184, -98.47393],
+      [19.266297, -98.473967],
+      [19.266769, -98.473925],
+      [19.267756, -98.473998],
+      [19.268021, -98.474077],
+      [19.268024, -98.474344],
+      [19.267629, -98.476399],
+      [19.267577, -98.477035],
+      [19.267128, -98.479442],
+      [19.267096, -98.479702],
+      [19.267131, -98.479827],
+      [19.267296, -98.478634],
+      [19.268019, -98.474733],
+      [19.268141, -98.473818],
+      [19.268444, -98.472319],
+      [19.268651, -98.471736],
+      [19.269067, -98.470112],
+      [19.2695, -98.468752],
+      [19.270285, -98.465857],
+      [19.270692, -98.464625],
+      [19.270773, -98.464226],
+      [19.271005, -98.463506],
+      [19.271385, -98.462644],
+      [19.271798, -98.461534],
+      [19.272074, -98.460994],
+      [19.272057, -98.460737],
+      [19.272528, -98.459672],
+      [19.272659, -98.45925],
+      [19.272877, -98.458821],
+      [19.27307, -98.458139],
+      [19.27332, -98.457685],
+      [19.273429, -98.457292],
+      [19.273883, -98.456255],
+      [19.273859, -98.456122],
+      [19.273941, -98.455808],
+      [19.274435, -98.454638],
+      [19.274698, -98.453706],
+      [19.275174, -98.452299],
+      [19.275771, -98.450744],
+      [19.275813, -98.450381],
+      [19.276447, -98.449014],
+      [19.276942, -98.447783],
+      [19.277186, -98.447362],
+      [19.277426, -98.446632],
+      [19.277759, -98.446002],
+      [19.279087, -98.442932],
+      [19.279508, -98.442208],
+      [19.279763, -98.441548],
+      [19.280404, -98.440398],
+      [19.28092, -98.439208],
+      [19.281383, -98.438613],
+      [19.28164, -98.438036],
+      [19.281703, -98.437576],
+      [19.281724, -98.436924],
+      [19.281549, -98.436876],
+      [19.28126, -98.436552],
+      [19.281034, -98.436197],
+      [19.280599, -98.435778],
+      [19.280438, -98.435564]
     ],
     stops: [
-      { name: 'Base San Simón', lat: 19.260428, lng: -98.475840, desc: 'Av. Guadalupe Victoria, San Simón Atzitzintla. Punto de salida, sube desde temprano.' },
-      { name: 'Centro de Salud y Campo Deportivo', lat: 19.26266319415861, lng: -98.473783073471, desc: 'Sobre Av. Sur, junto al centro de salud y el campo deportivo.' },
-      { name: 'Iglesia San Simón y Plaza', lat: 19.26503592756045, lng: -98.47278593212418, desc: 'Iglesia y plaza principal de San Simón.' },
-      { name: 'La Capilla', lat: 19.267305412889165, lng: -98.47392478914037, desc: 'Capilla de San Simón, entrada al pueblo. Parada muy solicitada.' },
-      { name: 'Entrada a San Rafael Tlanalapan', lat: 19.272046787005376, lng: -98.46081561175298, desc: 'Camino Real Iztaccíhuatl, entrada a San Rafael Tlanalapan.' },
-      { name: 'Los Arcos', lat: 19.27267554685216, lng: -98.4589748845061, desc: 'Parada Los Arcos, justo después de la entrada a San Rafael Tlanalapan.' },
-      { name: 'Caja de Agua', lat: 19.273297956240363, lng: -98.4576530200491, desc: 'Parada Caja de Agua, sobre Camino Real Iztaccíhuatl.' },
-      { name: 'El Libramiento', lat: 19.274398635598594, lng: -98.45436098967812, desc: 'Cruce con el libramiento, ya entrando hacia San Martín.' },
-      { name: 'Módulo de Vigilancia', lat: 19.279387085913882, lng: -98.44208837241015, desc: 'Parada frente al módulo de vigilancia, sobre Camino Real Iztaccíhuatl / San Salvador el Verde.' },
-      { name: 'Secundaria La Uno', lat: 19.28161584992344, lng: -98.43741861590993, desc: 'Parada frente a la Secundaria No. 1, sobre Av. México.' },
-      { name: 'Central de Autobuses', lat: 19.279755881243926, lng: -98.43447995257797, desc: 'Parada final en la Central de Autobuses (AU), sobre Carr. Internacional.' }
+      { name: 'Base San Simón', lat: 19.260428, lng: -98.475840, desc: 'Av. Guadalupe Victoria, San Simón Atzitzintla.' },
+      { name: 'Centro de Salud y Campo Deportivo', lat: 19.262663, lng: -98.473783, desc: 'Sobre Av. Sur, junto al centro de salud.' },
+      { name: 'Iglesia San Simón y Plaza', lat: 19.265036, lng: -98.472786, desc: 'Iglesia y plaza principal de San Simón.' },
+      { name: 'La Capilla', lat: 19.267305, lng: -98.473925, desc: 'Capilla de San Simón, entrada al pueblo.' },
+      { name: 'Entrada a San Rafael Tlanalapan', lat: 19.272047, lng: -98.460816, desc: 'Camino Real Iztaccíhuatl.' },
+      { name: 'Los Arcos', lat: 19.272676, lng: -98.458975, desc: 'Parada Los Arcos.' },
+      { name: 'Caja de Agua', lat: 19.273298, lng: -98.457653, desc: 'Parada Caja de Agua.' },
+      { name: 'El Libramiento', lat: 19.274399, lng: -98.454361, desc: 'Cruce con el libramiento.' },
+      { name: 'Módulo de Vigilancia', lat: 19.279387, lng: -98.442088, desc: 'Parada frente al módulo de vigilancia.' },
+      { name: 'Secundaria La Uno', lat: 19.281616, lng: -98.437419, desc: 'Parada frente a la Secundaria No. 1.' },
+      { name: 'Central de Autobuses', lat: 19.279756, lng: -98.434480, desc: 'Parada final en la Central de Autobuses.' }
     ]
   },
   secundaria: {
     color: '#1E9E5A',
     colorDark: '#147A43',
     label: 'Por Secundaria',
-    // Trazado real capturado sobre Av. Guadalupe Victoria → Av. Sur → C. Nacional →
-    // Revolución Nte. → San Salvador el Verde / Cam. Real Iztaccíhuatl, hacia San Rafael Tlanalapan.
     path: [
-      [19.260428, -98.475840], // Base San Simón (Av. Guadalupe Victoria)
+      [19.260428, -98.475840],
       [19.260664, -98.474837],
       [19.260535, -98.474477],
-      [19.260508, -98.474244], // da vuelta hacia Av. Sur
+      [19.260508, -98.474244],
       [19.260740, -98.473811],
       [19.261028, -98.473836],
       [19.261647, -98.473744],
@@ -519,41 +672,65 @@ const ROUTES = {
       [19.263699, -98.474139],
       [19.263627, -98.473846],
       [19.264675, -98.473808],
-      [19.265169, -98.474231], // entra a C. Nacional
+      [19.265169, -98.474231],
       [19.264938, -98.474847],
       [19.265186, -98.477161],
       [19.265219, -98.477719],
       [19.265167, -98.479308],
-      [19.265640, -98.479695], // Revolución Nte.
-      [19.267022, -98.479656], // Hacienda San José
+      [19.265640, -98.479695],
+      [19.267022, -98.479656],
       [19.268523, -98.479782],
       [19.267638, -98.476457],
       [19.266406, -98.482229],
       [19.268338, -98.471808],
       [19.268886, -98.471208],
-      [19.272046787005376, -98.46081561175298], // entrada a San Rafael Tlanalapan
-      [19.272676, -98.458975], // Los Arcos
-      [19.273298, -98.457653], // Caja de agua
-      [19.274399, -98.454361], // El Libramiento
-      [19.276800, -98.448500], // aprox. Cam. Real Iztaccíhuatl / San Salvador el Verde, pendiente afinar
-      [19.279387, -98.442088], // Módulo de vigilancia
-      [19.280500, -98.439700], // aprox. Agustín Lara / San Salvador el Verde, pendiente afinar
-      [19.281616, -98.437419], // Secundaria La Uno (Av. México)
-      [19.280700, -98.436000], // aprox. Av. México / Carr. Federal México-Puebla, pendiente afinar
-      [19.279756, -98.434480]  // Central de Autobuses (AU), Carr. Internacional
+      [19.272057, -98.460737],
+      [19.272528, -98.459672],
+      [19.272659, -98.45925],
+      [19.272877, -98.458821],
+      [19.27307, -98.458139],
+      [19.27332, -98.457685],
+      [19.273429, -98.457292],
+      [19.273883, -98.456255],
+      [19.273859, -98.456122],
+      [19.273941, -98.455808],
+      [19.274435, -98.454638],
+      [19.274698, -98.453706],
+      [19.275174, -98.452299],
+      [19.275771, -98.450744],
+      [19.275813, -98.450381],
+      [19.276447, -98.449014],
+      [19.276942, -98.447783],
+      [19.277186, -98.447362],
+      [19.277426, -98.446632],
+      [19.277759, -98.446002],
+      [19.279087, -98.442932],
+      [19.279508, -98.442208],
+      [19.279763, -98.441548],
+      [19.280404, -98.440398],
+      [19.28092, -98.439208],
+      [19.281383, -98.438613],
+      [19.28164, -98.438036],
+      [19.281703, -98.437576],
+      [19.281724, -98.436924],
+      [19.281549, -98.436876],
+      [19.28126, -98.436552],
+      [19.281034, -98.436197],
+      [19.280599, -98.435778],
+      [19.280438, -98.435564]
     ],
     stops: [
-      { name: 'Base San Simón', lat: 19.260428, lng: -98.475840, desc: 'Av. Guadalupe Victoria, San Simón Atzitzintla. Punto de salida, sube desde temprano.' },
-      { name: 'Vuelta a Av. Sur', lat: 19.260508, lng: -98.474244, desc: 'Esquina de Av. Guadalupe Victoria y Av. Sur, donde la combi da vuelta.' },
-      { name: 'Hacienda San José', lat: 19.267022, lng: -98.479656, desc: 'Sobre Revolución Nte., hace parada frente a la Hacienda San José.' },
-      { name: 'San Salvador el Verde', lat: 19.268523, lng: -98.479782, desc: 'Tramo por la calle San Salvador el Verde, antes de tomar Camino Real Iztaccíhuatl.' },
-      { name: 'Entrada a San Rafael Tlanalapan', lat: 19.272046787005376, lng: -98.46081561175298, desc: 'Camino Real Iztaccíhuatl, entrada a San Rafael Tlanalapan.' },
-      { name: 'Los Arcos', lat: 19.272676, lng: -98.458975, desc: 'Parada Los Arcos, justo después de la entrada a San Rafael Tlanalapan.' },
-      { name: 'Caja de Agua', lat: 19.273298, lng: -98.457653, desc: 'Parada Caja de Agua, sobre Camino Real Iztaccíhuatl.' },
-      { name: 'El Libramiento', lat: 19.274399, lng: -98.454361, desc: 'Cruce con el libramiento, ya entrando hacia San Martín.' },
-      { name: 'Módulo de Vigilancia', lat: 19.279387, lng: -98.442088, desc: 'Parada frente al módulo de vigilancia, sobre Camino Real Iztaccíhuatl / San Salvador el Verde.' },
-      { name: 'Secundaria La Uno', lat: 19.281616, lng: -98.437419, desc: 'Parada frente a la Secundaria No. 1, sobre Av. México.' },
-      { name: 'Central de Autobuses', lat: 19.279756, lng: -98.434480, desc: 'Parada final en la Central de Autobuses (AU), sobre Carr. Internacional.' }
+      { name: 'Base San Simón', lat: 19.260428, lng: -98.475840, desc: 'Av. Guadalupe Victoria, San Simón Atzitzintla.' },
+      { name: 'Vuelta a Av. Sur', lat: 19.260508, lng: -98.474244, desc: 'Esquina de Av. Guadalupe Victoria y Av. Sur.' },
+      { name: 'Hacienda San José', lat: 19.267022, lng: -98.479656, desc: 'Sobre Revolución Nte., frente a la Hacienda San José.' },
+      { name: 'San Salvador el Verde', lat: 19.268523, lng: -98.479782, desc: 'Tramo por la calle San Salvador el Verde.' },
+      { name: 'Entrada a San Rafael Tlanalapan', lat: 19.272047, lng: -98.460816, desc: 'Camino Real Iztaccíhuatl.' },
+      { name: 'Los Arcos', lat: 19.272676, lng: -98.458975, desc: 'Parada Los Arcos.' },
+      { name: 'Caja de Agua', lat: 19.273298, lng: -98.457653, desc: 'Parada Caja de Agua.' },
+      { name: 'El Libramiento', lat: 19.274399, lng: -98.454361, desc: 'Cruce con el libramiento.' },
+      { name: 'Módulo de Vigilancia', lat: 19.279387, lng: -98.442088, desc: 'Parada frente al módulo de vigilancia.' },
+      { name: 'Secundaria La Uno', lat: 19.281616, lng: -98.437419, desc: 'Parada frente a la Secundaria No. 1.' },
+      { name: 'Central de Autobuses', lat: 19.279756, lng: -98.434480, desc: 'Parada final en la Central de Autobuses.' }
     ]
   }
 };
@@ -564,103 +741,7 @@ let combiMarker, combiAnimId;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ============================================================
-   SONIDO (Web Audio API, sin archivos externos)
-   ============================================================ */
-let audioCtx;
-function getAudioCtx(){
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
-}
-function playTone(freq, duration, delay = 0, type = 'sine', gainPeak = 0.12){
-  try{
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    const t0 = ctx.currentTime + delay;
-    gain.gain.setValueAtTime(0, t0);
-    gain.gain.linearRampToValueAtTime(gainPeak, t0 + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.05);
-  } catch(e) { /* audio no disponible */ }
-}
-function playDing(){ playTone(880, 0.18, 0, 'sine', 0.1); playTone(1320, 0.18, 0.05, 'sine', 0.08); }
-function playHonk(){ playTone(220, 0.35, 0, 'sawtooth', 0.15); playTone(180, 0.35, 0.1, 'sawtooth', 0.15); }
-
-/* ============================================================
-   VIBRACIÓN
-   ============================================================ */
-function buzz(pattern){
-  if (navigator.vibrate) navigator.vibrate(pattern);
-}
-
-/* ============================================================
-   CONFETI (canvas ligero, sin dependencias)
-   ============================================================ */
-function confettiBurst(colorHex, count = 60){
-  if (reduceMotion) return;
-  let canvas = document.getElementById('confettiCanvas');
-  if (!canvas) {
-    canvas = document.createElement('canvas');
-    canvas.id = 'confettiCanvas';
-    document.body.appendChild(canvas);
-  }
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
-  canvas.style.width = window.innerWidth + 'px';
-  canvas.style.height = window.innerHeight + 'px';
-  ctx.scale(dpr, dpr);
-
-  const colors = [colorHex, '#F5900C', '#1E9E5A', '#0E80BE', '#FAF7F0'];
-  const particles = Array.from({ length: count }, () => ({
-    x: window.innerWidth / 2 + (Math.random() - 0.5) * 60,
-    y: window.innerHeight * 0.25,
-    vx: (Math.random() - 0.5) * 9,
-    vy: Math.random() * -7 - 3,
-    size: Math.random() * 6 + 4,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    rot: Math.random() * 360,
-    vr: (Math.random() - 0.5) * 18,
-    life: 0,
-  }));
-
-  let frame = 0;
-  function tick(){
-    frame++;
-    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    let alive = false;
-    particles.forEach(p => {
-      p.vy += 0.28;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.rot += p.vr;
-      p.life++;
-      if (p.y < window.innerHeight + 20) alive = true;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot * Math.PI / 180);
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = Math.max(0, 1 - p.life / 90);
-      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-      ctx.restore();
-    });
-    if (alive && frame < 120) {
-      requestAnimationFrame(tick);
-    } else {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    }
-  }
-  requestAnimationFrame(tick);
-}
-
-/* ============================================================
-   TEMA CLARO / OSCURO
+   TEMA CLARO / OSCURO (sin sonidos ni confeti)
    ============================================================ */
 const root = document.documentElement;
 const themeIcon = document.getElementById('themeIcon');
@@ -674,89 +755,10 @@ const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 applyTheme(prefersDark);
 
 document.getElementById('themeToggle').addEventListener('click', () => {
-  buzz(10);
   applyTheme(!root.classList.contains('dark'));
-  renderMarkers(); // refresh pin colors against new theme
-  startCombiAnimation(ROUTES[currentRoute]); // refresh combi icon color against new theme
+  renderMarkers();
+  startCombiAnimation(ROUTES[currentRoute]);
 });
-
-/* ============================================================
-   FRECUENCIA SEGÚN LA HORA
-   ============================================================ */
-function frequencyBucket(h){
-  if (h < 5.5 || h >= 21.5) return { outOfService: true };
-  if (h >= 7 && h < 9.5)     return { text: 'Cada 5 - 8 min (hora pico)', avg: 6.5 };
-  if (h >= 16 && h < 19.5)   return { text: 'Cada 5 - 8 min (hora pico)', avg: 6.5 };
-  if (h >= 9.5 && h < 13)    return { text: 'Cada 10 - 12 min', avg: 11 };
-  if (h >= 13 && h < 16)     return { text: 'Cada 8 - 10 min', avg: 9 };
-  if (h >= 19.5 && h < 21.5) return { text: 'Cada 12 - 18 min', avg: 15 };
-  return { text: 'Cada 15 - 20 min', avg: 17 };
-}
-
-function computeFrequency(){
-  const now = new Date();
-  const h = now.getHours() + now.getMinutes() / 60;
-  const day = now.getDay(); // 0=domingo ... 1=lunes, 2=martes
-
-  const tianguisAlert = document.getElementById('tianguisAlert');
-  tianguisAlert.classList.toggle('hidden', !(day === 1 || day === 2));
-
-  if (h < 5.5 || h >= 21.5) {
-    const mins = h < 5.5 ? Math.round((5.5 - h) * 60) : Math.round((29.5 - h) * 60);
-    return `Fuera de servicio · sale en ${Math.floor(mins/60) > 0 ? Math.floor(mins/60)+'h ' : ''}${mins % 60}min`;
-  }
-  return frequencyBucket(h).text;
-}
-
-/* ============================================================
-   PRÓXIMA SALIDA APROXIMADA
-   Secundaria sale primero en cada ciclo; Capilla sale ~8 min después.
-   Es un estimado basado en la frecuencia promedio del horario, no un
-   horario oficial de choferes.
-   ============================================================ */
-const CAPILLA_OFFSET_MIN = 8;
-const SERVICE_ANCHOR_HOUR = 5.5; // 5:30 AM, arranque de servicio
-
-function nextDepartureEstimate(){
-  const now = new Date();
-  const h = now.getHours() + now.getMinutes() / 60;
-  const bucket = frequencyBucket(h);
-  if (bucket.outOfService) return null;
-
-  const anchor = new Date(now);
-  anchor.setHours(5, 30, 0, 0);
-  const minsSinceAnchor = (now - anchor) / 60000;
-  const avg = bucket.avg;
-  const slots = Math.ceil((minsSinceAnchor + 0.01) / avg);
-  const nextSecundaria = new Date(anchor.getTime() + slots * avg * 60000);
-  const nextCapilla = new Date(nextSecundaria.getTime() + CAPILLA_OFFSET_MIN * 60000);
-
-  return { secundaria: nextSecundaria, capilla: nextCapilla };
-}
-
-function formatHora(date){
-  return date.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
-}
-
-function updateNextDeparture(){
-  const el = document.getElementById('nextDepartureText');
-  const est = nextDepartureEstimate();
-  if (!est) { el.innerHTML = ''; return; }
-
-  const secOn = currentRoute === 'secundaria';
-  const capOn = currentRoute === 'capilla';
-  const secStyle = secOn ? 'color:var(--route-color); font-weight:700;' : 'color:var(--ink-soft); font-weight:500;';
-  const capStyle = capOn ? 'color:var(--route-color); font-weight:700;' : 'color:var(--ink-soft); font-weight:500;';
-
-  el.innerHTML = `Próxima salida aprox · <span style="${secStyle}">Secundaria ${formatHora(est.secundaria)}</span> → <span style="${capStyle}">Capilla ${formatHora(est.capilla)}</span> <span style="opacity:.75;">(sale ~8 min después)</span>`;
-}
-
-function updateFrequency(){
-  document.getElementById('freqText').textContent = computeFrequency();
-  updateNextDeparture();
-}
-updateFrequency();
-setInterval(updateFrequency, 60000);
 
 /* ============================================================
    MAPA (Leaflet)
@@ -805,7 +807,6 @@ function updateDirectionBadge(route, reverse){
 }
 
 function startCombiAnimation(route){
-  if (typeof liveDriverActive !== 'undefined' && liveDriverActive) return; // ya se muestra la posición real del conductor
   if (combiAnimId) cancelAnimationFrame(combiAnimId);
   if (combiMarker) { map.removeLayer(combiMarker); combiMarker = null; }
 
@@ -818,9 +819,8 @@ function startCombiAnimation(route){
   let lastReverse = false;
   updateDirectionBadge(route, lastReverse);
 
-  // Recorre la ruta completa (ida y vuelta) en ~34 segundos, solo como referencia visual.
   const loopSeconds = 34;
-  const speed = (total * 2) / loopSeconds; // metros/seg, ida + vuelta
+  const speed = (total * 2) / loopSeconds;
   let startTime = null;
 
   function step(ts){
@@ -907,16 +907,17 @@ function renderRoute(){
 function focusStop(name){
   const marker = markerLayer.find(m => m._stopName === name);
   if (!marker) return;
+  // Cambiar a la pestaña de mapa primero
+  switchTab('mapa');
   map.setView(marker.getLatLng(), 16, { animate: true });
   marker.openPopup();
-  document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Llevar la vista (scroll) hasta el mapa para que se note el cambio
+  const mapEl = document.getElementById('map');
+  if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ============================================================
    MI UBICACIÓN (GPS real del celular del usuario)
-   Usa navigator.geolocation del propio dispositivo — no rastrea la
-   combi, solo muestra dónde está parada la persona respecto a la ruta.
-   Todo pasa en el navegador; no se manda a ningún servidor.
    ============================================================ */
 let userMarker, userAccuracyCircle, watchId = null;
 let hasCenteredOnUser = false;
@@ -967,11 +968,11 @@ function onLocationUpdate(pos){
 function onLocationError(err){
   let msg = 'No pudimos acceder a tu ubicación.';
   if (err.code === err.PERMISSION_DENIED) {
-    msg = 'Activa el permiso de ubicación de este sitio en tu navegador para verte en el mapa.';
+    msg = 'Activa el permiso de ubicación en tu navegador.';
   } else if (err.code === err.POSITION_UNAVAILABLE) {
-    msg = 'Tu ubicación no está disponible en este momento.';
+    msg = 'Tu ubicación no está disponible.';
   } else if (err.code === err.TIMEOUT) {
-    msg = 'Tardó demasiado en obtener tu ubicación. Intenta de nuevo.';
+    msg = 'Tardó demasiado. Intenta de nuevo.';
   }
   showLocateStatus(msg, true);
   stopLocating();
@@ -982,7 +983,6 @@ function startLocating(){
     showLocateStatus('Tu navegador no soporta geolocalización.', true);
     return;
   }
-  buzz(15);
   hasCenteredOnUser = false;
   showLocateStatus('Buscando tu ubicación…', false);
   document.getElementById('locateBtn').classList.add('active');
@@ -1014,64 +1014,102 @@ document.getElementById('locateBtn').addEventListener('click', () => {
 });
 
 /* ============================================================
-   ESTATUS DE LA RUTA — avisos que el propio conductor reporta a
-   mano desde conductor.html (botón "Reportar parada": salió de
-   base / llegó). A propósito, el panel público NUNCA lee
-   /driverLocation (la ubicación GPS exacta) — esa solo la ve el
-   dueño en dueno.html, protegida con su PIN. Aquí solo se leen
-   los últimos eventos de /routeEvents, que no traen coordenadas,
-   nada más la hora y qué pasó. Si Firebase no está configurado
-   todavía, esta parte simplemente no hace nada.
+   ALERTA DE TIANGUIS
    ============================================================ */
-let lastRouteEvents = [];
+function checkTianguis(){
+  const now = new Date();
+  const day = now.getDay();
+  const alert = document.getElementById('tianguisAlert');
+  alert.classList.toggle('hidden', !(day === 1 || day === 2));
+}
+checkTianguis();
 
-function timeAgoEs(ts){
-  return new Date(ts).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' });
+/* ============================================================
+   CALIFICAR (solo estrellas)
+   ============================================================ */
+let selectedRating = 0;
+
+function renderStars(){
+  const wrap = document.getElementById('starContainer');
+  wrap.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rating-star';
+    btn.dataset.value = i;
+    btn.setAttribute('aria-label', `${i} estrella${i > 1 ? 's' : ''}`);
+    btn.textContent = '★';
+    wrap.appendChild(btn);
+  }
+
+  const stars = wrap.querySelectorAll('.rating-star');
+  function paint(upTo){
+    stars.forEach(s => {
+      s.style.color = parseInt(s.dataset.value) <= upTo ? 'var(--cempasuchil)' : 'var(--border)';
+    });
+  }
+  stars.forEach(star => {
+    star.addEventListener('click', () => {
+      selectedRating = parseInt(star.dataset.value);
+      document.getElementById('ratingValue').value = selectedRating;
+      paint(selectedRating);
+    });
+    star.addEventListener('mouseenter', () => paint(parseInt(star.dataset.value)));
+  });
+  wrap.addEventListener('mouseleave', () => paint(selectedRating));
 }
 
-function routeEventLabel(route){
-  if (route === 'secundaria') return 'Por Secundaria';
-  if (route === 'capilla') return 'Por Capilla';
-  return '';
-}
+function renderAvgRating(ratings){
+  const count = ratings.length;
+  const avgText = document.getElementById('avgRatingText');
 
-function renderRouteEvents(){
-  const list = document.getElementById('routeEventsList');
-  const emptyMsg = 'Todavía no hay avisos de los conductores hoy en este ramal.';
-  // solo se muestran los avisos del ramal que el pasajero tiene
-  // seleccionado arriba, para no mezclar Capilla con Secundaria
-  const filtered = lastRouteEvents.filter(ev => !ev.route || ev.route === currentRoute);
-  if (!filtered.length) {
-    list.innerHTML = `<p id="routeEventsEmpty" class="text-sm text-center" style="color:var(--ink-soft);">${emptyMsg}</p>`;
+  if (!count) {
+    avgText.textContent = 'Sé el primero en calificar hoy.';
     return;
   }
-  list.innerHTML = filtered.slice().reverse().map((ev) => `
-    <div class="flex items-center gap-2.5">
-      <span class="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style="background:color-mix(in srgb, var(--agave) 16%, var(--paper-2)); color:var(--agave);"><i data-lucide="flag" class="w-3.5 h-3.5"></i></span>
-      <div class="min-w-0">
-        <p class="text-sm font-medium truncate">${ev.label || 'Aviso de ruta'}${ev.route ? ' · ' + routeEventLabel(ev.route) : ''}</p>
-        <p class="text-[11px] font-mono" style="color:var(--ink-soft);">${ev.createdAt ? timeAgoEs(ev.createdAt) : '—'}</p>
-      </div>
-    </div>
-  `).join('');
-  if (window.lucide) lucide.createIcons();
+  const avg = ratings.reduce((sum, r) => sum + (r.rating || 0), 0) / count;
+  avgText.textContent = `★ ${avg.toFixed(1)} de promedio · ${count} calificaci${count === 1 ? 'ón' : 'ones'}`;
 }
 
 if (typeof db !== 'undefined' && db) {
   try {
-    // routeEvents ahora es un objeto con UN aviso por conductor (la
-    // clave es el id del conductor), no una lista que crece — cada
-    // quien solo tiene su aviso más reciente.
-    db.ref('routeEvents').on('value',
+    db.ref('ratings').on('value',
       (snapshot) => {
         const data = snapshot.val() || {};
-        lastRouteEvents = Object.values(data).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-        renderRouteEvents();
+        renderAvgRating(Object.values(data));
       },
-      () => { /* sin conexión a Firebase por ahora, la app sigue funcionando normal */ }
+      () => { /* sin conexión */ }
     );
-  } catch (e) { /* Firebase no configurado todavía, ver firebase-config.js */ }
+  } catch (e) { /* Firebase no configurado */ }
 }
+
+document.getElementById('ratingForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const rating = parseInt(document.getElementById('ratingValue').value) || 0;
+  if (!rating) return;
+
+  const entry = {
+    rating,
+    route: currentRoute,
+    createdAt: Date.now(),
+  };
+
+  const finish = () => {
+    document.getElementById('ratingForm').reset();
+    selectedRating = 0;
+    renderStars();
+    document.getElementById('ratingThanks').classList.remove('hidden');
+    setTimeout(() => document.getElementById('ratingThanks').classList.add('hidden'), 3500);
+  };
+
+  if (typeof db !== 'undefined' && db) {
+    try {
+      db.ref('ratings').push(entry).then(finish).catch(finish);
+    } catch (e) { finish(); }
+  } else {
+    finish();
+  }
+});
 
 /* ============================================================
    LISTA DE PARADAS (acordeón)
@@ -1110,7 +1148,6 @@ function renderStopsList(){
 
   container.querySelectorAll('.stop-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
-      buzz(10);
       const panel = btn.nextElementSibling;
       const chevron = btn.querySelector('.chevron');
       const wasOpen = panel.classList.contains('open');
@@ -1126,8 +1163,6 @@ function renderStopsList(){
   container.querySelectorAll('.ver-mapa-btn').forEach((btn, i) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      buzz(15);
-      playDing();
       focusStop(route.stops[i].name);
     });
   });
@@ -1135,11 +1170,116 @@ function renderStopsList(){
   container.querySelectorAll('.compartir-btn').forEach((btn, i) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      buzz(15);
       shareStopWhatsApp(route.stops[i], route);
     });
   });
 }
+
+/* ============================================================
+   COMPARTIR PARADA POR WHATSAPP
+   ============================================================ */
+function shareStopWhatsApp(stop, route){
+  const mapsUrl = `https://www.google.com/maps?q=${stop.lat},${stop.lng}`;
+  const text = `🚐 Ruta San Simón - ${route.label}\n📍 Parada: ${stop.name}\n${stop.desc}\n\nUbicación en el mapa:\n${mapsUrl}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener');
+}
+
+/* ============================================================
+   AVISOS DE RUTA (solo visual por ahora)
+   La publicación real (Dueño/Checador) y la conexión a Supabase
+   se integrarán en una siguiente etapa. Por ahora se simula con
+   datos de ejemplo para validar el diseño y la lógica de vigencia.
+   ============================================================ */
+const MOCK_AVISOS = [
+  {
+    id: 'demo-1',
+    mensaje: 'Hoy la combi se desvía por arreglo en la calle Morelos, cerca de la Central.',
+    tipo: 'desvio',
+    createdAt: Date.now() - 1000 * 60 * 30,
+    expiresAt: Date.now() + 1000 * 60 * 60 * 5, // vence hoy mismo
+  },
+  {
+    id: 'demo-2',
+    mensaje: 'Procura salir temprano, las combis están tardando más por el tráfico de la tarde.',
+    tipo: 'info',
+    createdAt: Date.now() - 1000 * 60 * 60 * 2,
+    expiresAt: Date.now() + 1000 * 60 * 60 * 24, // vence mañana
+  },
+  {
+    id: 'demo-3',
+    mensaje: 'Por obras en la carretera, algunas salidas pueden tardar hasta 20 minutos más de lo normal.',
+    tipo: 'alerta',
+    createdAt: Date.now() - 1000 * 60 * 60 * 5,
+    expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 3, // vence en 3 días
+  },
+];
+
+const AVISO_STYLES = {
+  desvio: { icon: 'route', color: 'var(--cempasuchil)', label: 'Desvío de ruta' },
+  info:   { icon: 'info',  color: 'var(--talavera)',     label: 'Informativo' },
+  alerta: { icon: 'triangle-alert', color: 'var(--alerta)', label: 'Alerta' },
+};
+
+function formatVigencia(expiresAt){
+  const fecha = new Date(expiresAt);
+  const hoy = new Date();
+  const esMismoDia = fecha.toDateString() === hoy.toDateString();
+  const manana = new Date(hoy);
+  manana.setDate(hoy.getDate() + 1);
+  const esManana = fecha.toDateString() === manana.toDateString();
+
+  const fechaTexto = fecha.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+  const fechaCapitalizada = fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1);
+
+  if (esMismoDia) return `Hoy, ${fechaCapitalizada}`;
+  if (esManana) return `Mañana, ${fechaCapitalizada}`;
+  return fechaCapitalizada;
+}
+
+function renderAvisos(){
+  const list = document.getElementById('avisosList');
+  const empty = document.getElementById('avisosEmpty');
+  if (!list || !empty) return;
+
+  // Filtra automáticamente los avisos ya vencidos
+  const vigentes = MOCK_AVISOS.filter(a => a.expiresAt > Date.now());
+
+  if (!vigentes.length) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = vigentes
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(a => {
+      const style = AVISO_STYLES[a.tipo] || AVISO_STYLES.info;
+      return `
+        <section class="placard placard-hover p-4">
+          <div class="flex items-start gap-3">
+            <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background:color-mix(in srgb, ${style.color} 18%, var(--paper-2)); color:${style.color};">
+              <i data-lucide="${style.icon}" class="w-4 h-4"></i>
+            </span>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+                <span class="text-[10.5px] font-semibold" style="color:${style.color};">${style.label}</span>
+                <span class="text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-full ml-auto shrink-0" style="background:var(--surface); color:var(--ink-soft);">${formatVigencia(a.expiresAt)}</span>
+              </div>
+              <p class="text-[13.5px] leading-snug break-words" style="color:var(--ink);">${a.mensaje}</p>
+            </div>
+          </div>
+        </section>
+      `;
+    })
+    .join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// Vuelve a evaluar la vigencia cada minuto para ocultar avisos vencidos automáticamente
+setInterval(renderAvisos, 60 * 1000);
 
 /* ============================================================
    SELECTOR DE RAMAL
@@ -1160,14 +1300,6 @@ function setRoute(routeKey){
 
   renderRoute();
   renderStopsList();
-  updateNextDeparture();
-  if (typeof renderRouteEvents === 'function') renderRouteEvents();
-
-  if (changed) {
-    buzz(20);
-    playDing();
-    confettiBurst(route.color, 40);
-  }
 }
 
 document.querySelectorAll('.route-btn').forEach(btn => {
@@ -1175,26 +1307,39 @@ document.querySelectorAll('.route-btn').forEach(btn => {
 });
 
 /* ============================================================
-   COMPARTIR PARADA POR WHATSAPP
+   PESTAÑAS (switch sin scroll)
    ============================================================ */
-function shareStopWhatsApp(stop, route){
-  const mapsUrl = `https://www.google.com/maps?q=${stop.lat},${stop.lng}`;
-  const text = `🚐 Ruta San Simón - ${route.label}\n📍 Parada: ${stop.name}\n${stop.desc}\n\nUbicación en el mapa:\n${mapsUrl}`;
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank', 'noopener');
+function switchTab(tabId){
+  // Ocultar todos los contenidos
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  // Mostrar el seleccionado
+  const target = document.getElementById('tab-' + tabId);
+  if (target) target.classList.add('active');
+
+  // Actualizar botones
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+
+  // Si es la pestaña de mapa, invalidar tamaño del mapa y volver a encuadrar la ruta
+  // (el mapa se inicializa oculto, así que su tamaño/zoom queda mal calculado
+  // hasta que la pestaña realmente se muestra en pantalla)
+  if (tabId === 'mapa' && map) {
+    setTimeout(() => {
+      map.invalidateSize();
+      if (pathLayer) map.fitBounds(pathLayer.getBounds(), { padding: [24, 24] });
+    }, 120);
+  }
 }
 
-/* ============================================================
-   EASTER EGG: BOCINAZO
-   ============================================================ */
-document.getElementById('hornBtn').addEventListener('click', () => {
-  buzz([30, 40, 30]);
-  playHonk();
-  confettiBurst('#F5900C', 70);
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    switchTab(btn.dataset.tab);
+  });
 });
 
 /* ============================================================
-   PWA: INSTALACIÓN Y SERVICE WORKER
+   PWA: INSTALACIÓN
    ============================================================ */
 let deferredInstallPrompt;
 const installBtn = document.getElementById('installBtn');
@@ -1208,7 +1353,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 installBtn.addEventListener('click', async () => {
   if (!deferredInstallPrompt) return;
-  buzz(15);
   deferredInstallPrompt.prompt();
   await deferredInstallPrompt.userChoice;
   deferredInstallPrompt = null;
@@ -1219,12 +1363,11 @@ installBtn.addEventListener('click', async () => {
 window.addEventListener('appinstalled', () => {
   installBtn.classList.add('hidden');
   installBtn.classList.remove('show');
-  confettiBurst('#1E9E5A', 80);
 });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* offline no disponible */ });
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
 
@@ -1232,9 +1375,12 @@ if ('serviceWorker' in navigator) {
    INICIO
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.lucide) lucide.createIcons();
-  initMap();
-  renderStopsList();
+  const safe = (fn) => { try { fn(); } catch (e) { console.error('Error al iniciar:', e); } };
+  safe(() => { if (window.lucide) lucide.createIcons(); });
+  safe(initMap);
+  safe(renderStopsList);
+  safe(renderStars);
+  safe(renderAvisos);
 });
 </script>
 </body>
