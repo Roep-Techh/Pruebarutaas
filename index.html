@@ -1114,9 +1114,8 @@ document.getElementById('ratingForm').addEventListener('submit', (e) => {
   };
 
   const finish = () => {
-    document.getElementById('ratingForm').reset();
-    selectedRating = 0;
-    renderStars();
+    // Ya no reseteamos selectedRating: las estrellas se quedan pintadas
+    // con la calificación que el usuario acaba de enviar.
     document.getElementById('ratingThanks').classList.remove('hidden');
     setTimeout(() => document.getElementById('ratingThanks').classList.add('hidden'), 3500);
   };
