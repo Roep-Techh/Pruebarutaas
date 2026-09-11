@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+  (function(){
+    try{
+      var t = localStorage.getItem('rss_theme');
+      document.documentElement.setAttribute('data-theme', (t === 'light') ? 'light' : 'dark');
+    }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0E13">
+<title>Panel del Conductor · Ruta San Simón (R-18)</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="manifest" href="manifest-conductor.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<!-- Importamos Supabase como módulo -->
+<script type="importmap">
+{
+  "imports": {
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+  }
+}
+</script>
+<script type="module" src="conductor-logic.js"></script>
+
+<style>
+  /* ===== TOKENS ===== */
+  :root{
+    --canvas:#0A0E13; --surface:#11161D; --surface-2:#171E27; --surface-3:#1D2530;
+    --ink:#EDF1F5; --ink-soft:#8A94A3; --ink-faint:#5C6572;
+    --border:#232B36; --border-soft:#1A212B;
+
+    --talavera:#3FB0F0; --talavera-dark:#1C86C4; --talavera-glow:rgba(63,176,240,.35);
+    --agave:#2FD98A; --agave-dark:#1FAE6D; --agave-glow:rgba(47,217,138,.35);
+    --cempasuchil:#FFAE33; --cempasuchil-dark:#E08E12; --cempasuchil-glow:rgba(255,174,51,.3);
+    --alerta:#FF5C4D; --alerta-dark:#D93E30; --alerta-bg:rgba(255,92,77,.14); --alerta-glow:rgba(255,92,77,.35);
+
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px -12px rgba(0,0,0,.55);
+    --shadow-md: 0 20px 50px -18px rgba(0,0,0,.65);
+  }
+
+  html[data-theme="light"]{
+    color-scheme: light;
+    --canvas:#FAF7F0; --surface:#FFFFFF; --surface-2:#F4EEDC; --surface-3:#EDE4C8;
+    --ink:#221B12; --ink-soft:#7C7261; --ink-faint:#9C9280;
+    --border:#E4DBC5; --border-soft:#EFE8D4;
+
+    --talavera:#0E80BE; --talavera-dark:#0A5F8E; --talavera-glow:rgba(14,128,190,.22);
+    --agave:#1E9E5A; --agave-dark:#147A43; --agave-glow:rgba(30,158,90,.22);
+    --cempasuchil:#F5900C; --cempasuchil-dark:#CB7208; --cempasuchil-glow:rgba(245,144,12,.22);
+    --alerta:#E1483A; --alerta-dark:#B93627; --alerta-bg:rgba(225,72,58,.12); --alerta-glow:rgba(225,72,58,.22);
+
+    --shadow: 0 1px 2px rgba(34,27,18,.06), 0 6px 16px -8px rgba(34,27,18,.14);
+    --shadow-md: 0 14px 34px -16px rgba(34,27,18,.2);
+  }
+  .theme-toggle-btn .theme-icon-moon{ display:none; }
+  html[data-theme="light"] .theme-toggle-btn .theme-icon-sun{ display:none; }
+  html[data-theme="light"] .theme-toggle-btn .theme-icon-moon{ display:flex; }
+  *{ -webkit-tap-highlight-color: transparent; }
+  html{ color-scheme: dark; }
+  html, body{ height:100%; }
+  body{ background:var(--canvas); color:var(--ink); font-family:'Plus Jakarta Sans', sans-serif; }
+  .font-display{ font-family:'Sora', sans-serif; letter-spacing:-.01em; }
+  .font-mono{ font-family:'JetBrains Mono', monospace; letter-spacing:-.01em; }
+  .placard{ background:var(--surface); border:1px solid var(--border); border-radius:1.25rem; box-shadow:var(--shadow); transition: box-shadow .3s ease, transform .3s ease; }
+  [data-lucide]{ width:18px; height:18px; stroke-width:2.1; }
+
+  .bg-grid{
+    background-image:
+      radial-gradient(60rem 30rem at 15% -10%, rgba(63,176,240,.10), transparent 60%),
+      radial-gradient(50rem 26rem at 110% 10%, rgba(47,217,138,.07), transparent 55%),
+      linear-gradient(var(--border-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+    background-size: auto, auto, 42px 42px, 42px 42px;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  }
+
+  .btn-lift{ transition: all .25s cubic-bezier(.2,.8,.2,1); }
+  .btn-lift:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .btn-lift:active{ transform: translateY(0) scale(.97); }
+
+  #toggleRow{
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    flex-wrap:wrap; width:100%;
+  }
+  #toggleBtn{
+    width:clamp(132px, 40vw, 190px); height:clamp(132px, 40vw, 190px); border-radius:50%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border:1px solid var(--border); background:var(--surface); box-shadow:var(--shadow);
+    font-family:'Sora', sans-serif; font-weight:600; color:var(--ink);
+    transition: all .3s cubic-bezier(.2,.8,.2,1);
+    flex-shrink:0;
+  }
+  #toggleBtn:hover{ transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  #toggleBtn:active{ transform: scale(.98); }
+  #toggleBtn.on{
+    background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%);
+    border-color:var(--agave-dark); color:#052414; box-shadow: 0 20px 50px -14px var(--agave-glow);
+  }
+  /* Antes: animaba box-shadow, que no es "GPU-compositable" y obliga al
+     navegador a repintar esa zona en cada fotograma mientras el botón
+     está "on" (o sea, durante todo el turno). Ahora: mismo efecto visual,
+     pero animando transform+opacity en un pseudo-elemento, que sí corre
+     en la capa de composición (GPU) sin repintar constantemente. */
+  #toggleBtn.on .pulseDot{ position:relative; }
+  #toggleBtn.on .pulseDot::after{
+    content:'';
+    position:absolute; inset:0; border-radius:50%;
+    background:rgba(5,36,20,.4);
+    animation: pulse 1.4s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{ transform:scale(1); opacity:.4; }
+    100%{ transform:scale(1.6); opacity:0; }
+  }
+  .pulseDot{ width:26px; height:26px; border-radius:50%; background:var(--surface-2); margin-bottom:10px; display:flex; align-items:center; justify-content:center; }
+  #toggleBtn:not(.on) .pulseDot [data-lucide]{ width:14px; height:14px; color:var(--ink-soft); }
+  #toggleBtn.on .pulseDot{ background:rgba(5,36,20,.25); }
+  #toggleBtn.on .pulseDot [data-lucide]{ width:14px; height:14px; color:#052414; }
+
+  #panicBtn{
+    position:fixed; right:18px; bottom:18px; z-index:55;
+    width:64px; height:64px; border-radius:50%;
+    background: linear-gradient(155deg, var(--alerta) 0%, var(--alerta-dark) 100%); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 10px 30px -8px var(--alerta-glow), 0 0 0 4px var(--canvas);
+    border:2px solid rgba(255,255,255,.15);
+    transition: all .25s cubic-bezier(.2,.8,.2,1);
+  }
+  #panicBtn:hover{ transform: translateY(-2px) scale(1.03); }
+  #panicBtn:active{ transform: scale(.94); }
+  #panicOverlay{
+    position:fixed; inset:0; z-index:70;
+    background:rgba(5,7,10,.68); backdrop-filter: blur(2px);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  #panicOverlay.show{ display:flex; }
+  #panicSheet{
+    width:100%; max-width:28rem;
+    background:var(--surface); border-radius:1.75rem 1.75rem 0 0;
+    padding:1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+    border-top:1px solid var(--border);
+    box-shadow: 0 -20px 50px -18px rgba(0,0,0,.7);
+  }
+
+  #installBtn.show{ display:flex; }
+
+  #unitPickerOverlay{
+    position:fixed; inset:0; z-index:65;
+    background:rgba(5,7,10,.68); backdrop-filter: blur(2px);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  #unitPickerOverlay.show{ display:flex; }
+  #unitPickerSheet{
+    width:100%; max-width:28rem;
+    background:var(--surface); border-radius:1.75rem 1.75rem 0 0;
+    padding:1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+    border-top:1px solid var(--border);
+    box-shadow: 0 -20px 50px -18px rgba(0,0,0,.7);
+    max-height:80vh; overflow-y:auto;
+  }
+  .unit-pick-btn{
+    border:1.5px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:1rem; padding:.9rem .5rem; font-family:'Sora', sans-serif; font-weight:700; font-size:15px;
+    display:flex; flex-direction:column; align-items:center; gap:.25rem;
+    transition: all .2s ease;
+  }
+  .unit-pick-btn:hover{ border-color:var(--talavera); transform: translateY(-1px); }
+  .unit-pick-btn:active{ transform: scale(.97); }
+  .unit-pick-btn.current{ background: linear-gradient(155deg, var(--talavera) 0%, var(--talavera-dark) 100%); border-color:var(--talavera-dark); color:#08131c; box-shadow:var(--shadow); }
+  .unit-pick-btn .unit-pick-tag{ font-size:10px; font-weight:600; letter-spacing:.02em; opacity:.8; }
+
+  .ramal-btn{
+    border:1.5px solid var(--border); background:var(--surface-2); color:var(--ink-soft);
+    border-radius:1rem; padding:.8rem; font-family:'Sora', sans-serif; font-weight:600; font-size:14px;
+    transition: all .2s ease;
+  }
+  .ramal-btn:not(.active):hover{ border-color:var(--talavera); color:var(--ink); transform: translateY(-1px); }
+  .ramal-btn.active[data-route="capilla"]{ background: linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%); border-color:var(--cempasuchil-dark); color:#1b1002; box-shadow:var(--shadow); }
+  .ramal-btn.active[data-route="secundaria"]{ background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%); border-color:var(--agave-dark); color:#052414; box-shadow:var(--shadow); }
+  .ramal-btn.needs-choice{ border-color:var(--talavera); position:relative; }
+  .ramal-btn.needs-choice::after{
+    content:'';
+    position:absolute; inset:0; border-radius:inherit;
+    box-shadow: 0 0 0 5px rgba(214,84,64,.35);
+    animation: ramalPulse 1.6s ease-in-out infinite;
+  }
+  #ramalLabel.needs-choice{ color:var(--talavera); font-weight:700; }
+  @keyframes ramalPulse{
+    0%, 100% { transform: scale(1); opacity:1; }
+    50% { transform: scale(1.03); opacity:0; }
+  }
+
+  #turnoBtn.on{ background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%) !important; color:#052414 !important; }
+  #reposoBtn.active{ background:var(--surface-2) !important; color:var(--ink-soft) !important; border:1.5px dashed var(--border); }
+
+  #pinInput{ letter-spacing:.15em; }
+
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--surface-3); border-radius:999px; }
+  ::selection{ background: var(--talavera-glow); }
+  input::placeholder{ color: var(--ink-faint); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; animation: none !important; }
+  }
+
+  /* ===== AVATAR ===== */
+  .avatar-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 2px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s;
+    position: relative;
+  }
+  .avatar-wrapper:hover {
+    border-color: var(--talavera);
+    transform: scale(1.05);
+  }
+  .avatar-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .avatar-wrapper .avatar-default {
+    color: var(--ink-soft);
+    width: 22px;
+    height: 22px;
+  }
+  .avatar-wrapper .avatar-hint {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    background: var(--talavera);
+    color: #08131c;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .avatar-wrapper:hover .avatar-hint {
+    opacity: 1;
+  }
+
+  /* ===== MODAL DE PERSONALIZACIÓN ===== */
+  #profileModalOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(5,7,10,0.7);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  #profileModalOverlay.show {
+    display: flex;
+  }
+  #profileModalSheet {
+    width: 100%;
+    max-width: 22rem;
+    background: var(--surface);
+    border-radius: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    animation: modalIn 0.25s ease-out;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  #profileModalSheet .avatar-preview {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin: 0.5rem auto 1rem;
+    border: 3px solid var(--border);
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #profileModalSheet .avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #profileModalSheet .avatar-preview .default-icon {
+    color: var(--ink-soft);
+    width: 48px;
+    height: 48px;
+  }
+  .profile-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .profile-actions button,
+  .profile-actions label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 1rem;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .profile-actions button:hover,
+  .profile-actions label:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  .profile-actions button:active,
+  .profile-actions label:active {
+    transform: scale(0.97);
+  }
+  .profile-actions .btn-danger {
+    background: var(--alerta-bg);
+    border-color: var(--alerta);
+    color: var(--alerta);
+  }
+  .profile-actions .btn-danger:hover {
+    background: var(--alerta);
+    color: #fff;
+  }
+  .profile-actions .btn-close {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+  .profile-actions .btn-close:hover {
+    background: var(--surface-3);
+    border-color: var(--border);
+  }
+
+  /* ===== MODAL DE CONFIRMACIÓN (eliminar) ===== */
+  #confirmModalOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(5,7,10,0.75);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  #confirmModalOverlay.show {
+    display: flex;
+  }
+  #confirmModalSheet {
+    width: 100%;
+    max-width: 18rem;
+    background: var(--surface);
+    border-radius: 1.75rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    animation: modalIn 0.2s ease-out;
+  }
+  #confirmModalSheet h3 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: var(--alerta);
+  }
+  #confirmModalSheet p {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    margin-bottom: 1.25rem;
+    line-height: 1.5;
+  }
+  .confirm-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .confirm-actions button {
+    flex: 1;
+    padding: 0.7rem;
+    border-radius: 1rem;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .confirm-actions button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  .confirm-actions .btn-confirm-danger {
+    background: var(--alerta);
+    border-color: var(--alerta-dark);
+    color: #fff;
+  }
+  .confirm-actions .btn-confirm-danger:hover {
+    background: var(--alerta-dark);
+  }
+  .confirm-actions .btn-confirm-cancel:hover {
+    background: var(--surface-3);
+  }
+
+  /* input file oculto */
+  #avatarFileInput {
+    display: none;
+  }
+
+  /* ===== MODAL DE SALUDO (bienvenida) ===== */
+  #welcomeOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(5,7,10,0.6);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    animation: fadeIn 0.3s ease;
+  }
+  #welcomeOverlay.show {
+    display: flex;
+  }
+  #welcomeOverlay.fade-out {
+    animation: fadeOut 0.3s ease forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  #welcomeCard {
+    max-width: 24rem;
+    width: 100%;
+    background: var(--surface);
+    border-radius: 2rem;
+    padding: 2rem 1.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    animation: welcomePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: center;
+  }
+  @keyframes welcomePop {
+    0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  #welcomeCard .welcome-icon {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    color: #052414;
+    box-shadow: 0 8px 24px -8px var(--agave-glow);
+  }
+  #welcomeCard .welcome-icon svg {
+    width: 36px;
+    height: 36px;
+  }
+  #welcomeCard h2 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+    color: var(--ink);
+  }
+  #welcomeCard p {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+  #welcomeCard .welcome-sub {
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--border-soft);
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+  }
+  #welcomeCard .btn-close-welcome {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--ink-soft);
+    padding: 0.6rem 1.5rem;
+    border-radius: 2rem;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  #welcomeCard .btn-close-welcome:hover {
+    background: var(--surface-3);
+    border-color: var(--talavera);
+    color: var(--ink);
+  }
+
+  /* ===== MODAL DE ACTUALIZACIÓN (VERSIONES) ===== */
+  #updateOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: rgba(5,7,10,0.8);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  #updateOverlay.show {
+    display: flex;
+  }
+  #updateCard {
+    max-width: 26rem;
+    width: 100%;
+    background: var(--surface);
+    border-radius: 2rem;
+    padding: 2rem 1.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    animation: welcomePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #updateCard .update-icon {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    color: #1b1002;
+    box-shadow: 0 8px 24px -8px var(--cempasuchil-glow);
+  }
+  #updateCard .update-icon svg {
+    width: 36px;
+    height: 36px;
+  }
+  #updateCard h2 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+    color: var(--ink);
+  }
+  #updateCard .update-version {
+    display: inline-block;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.2rem 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    margin-bottom: 0.75rem;
+  }
+  #updateCard .update-changelog {
+    text-align: left;
+    background: var(--surface-2);
+    border-radius: 1rem;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0 1.5rem;
+    border: 1px solid var(--border-soft);
+  }
+  #updateCard .update-changelog ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  #updateCard .update-changelog li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  #updateCard .update-changelog li:last-child {
+    border-bottom: none;
+  }
+  #updateCard .update-changelog li i {
+    margin-top: 0.15rem;
+    color: var(--agave);
+  }
+  .update-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+  .update-actions button {
+    padding: 0.7rem 1.8rem;
+    border-radius: 2rem;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .update-actions button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .update-actions .btn-update {
+    background: linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%);
+    border-color: var(--agave-dark);
+    color: #052414;
+  }
+  .update-actions .btn-update:hover {
+    box-shadow: 0 8px 24px -8px var(--agave-glow);
+  }
+  .update-actions .btn-skip {
+    background: transparent;
+    color: var(--ink-soft);
+  }
+  .update-actions .btn-skip:hover {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--ink);
+  }
+
+  /* Indicador de versión en el footer */
+  #versionFooter {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ink-faint);
+    opacity: 0.4;
+    z-index: 20;
+    pointer-events: none;
+  }
+    /* ===== MODAL DE AVISO DE PRIVACIDAD ===== */
+  #privacyOverlay {
+    position: fixed; inset: 0; z-index: 95;
+    background: rgba(5,7,10,0.72);
+    backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  #privacyOverlay.show { display: flex; }
+  #privacySheet {
+    width: 100%; max-width: 26rem; max-height: 80vh; overflow-y: auto;
+    background: var(--surface); border-radius: 1.75rem; padding: 1.5rem;
+    border: 1px solid var(--border); box-shadow: var(--shadow-md);
+    animation: modalIn 0.25s ease-out;
+  }
+  #privacySheet h3 {
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1.1rem;
+    margin-bottom: .75rem; color: var(--ink);
+  }
+  #privacySheet h4 {
+    font-family: 'Sora', sans-serif; font-weight: 600; font-size: .85rem;
+    margin-top: 1rem; margin-bottom: .25rem; color: var(--talavera);
+  }
+  #privacySheet p, #privacySheet li { font-size: .82rem; line-height: 1.5; color: var(--ink-soft); }
+  #privacySheet ul { padding-left: 1.1rem; margin: .25rem 0; }
+  .privacy-link-btn {
+    background: transparent; border: none; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-faint); text-decoration: underline;
+    cursor: pointer; padding: .25rem;
+  }
+  .privacy-link-btn:hover { color: var(--talavera); }
+  #privacyCloseBtn {
+    margin-top: 1.25rem; width: 100%; padding: .75rem; border-radius: 1rem;
+    font-family: 'Sora', sans-serif; font-weight: 600; font-size: .9rem;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+    cursor: pointer; transition: all .2s;
+  }
+  #privacyCloseBtn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+</style>
+</head>
+<body class="font-body bg-grid">
+
+<!-- PANTALLA DE LOGIN DE CONDUCTOR -->
+<div id="pinScreen" class="min-h-screen flex items-center justify-center px-6">
+  <div class="placard p-7 w-full max-w-sm text-center relative">
+    <button class="theme-toggle-btn btn-lift absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center" aria-label="Cambiar a tema claro/oscuro" style="background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft);">
+      <span class="theme-icon-sun flex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
+      <span class="theme-icon-moon flex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+    </button>
+    <div class="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center" style="background:linear-gradient(155deg, var(--talavera) 0%, var(--talavera-dark) 100%); color:#08131c;">
+      <i data-lucide="bus"></i>
+    </div>
+    <h1 class="font-display font-semibold text-xl">Panel del Conductor</h1>
+    <p class="text-sm mt-1" style="color:var(--ink-soft);">Ruta San Simón · R-18</p>
+    <p class="text-xs mt-4" style="color:var(--ink-soft);">Entra con tu PIN personal</p>
+    <input id="pinInput" type="password" inputmode="numeric" placeholder="PIN"
+           class="mt-2 w-full text-center text-2xl font-mono py-3 rounded-2xl border"
+           style="background:var(--surface-2); border-color:var(--border); color:var(--ink);">
+    <p id="pinError" class="text-sm mt-2 hidden" style="color:var(--alerta);">PIN incorrecto, intenta otra vez.</p>
+    <button id="pinSubmit" class="btn-lift mt-4 w-full py-3 rounded-2xl font-display font-semibold" style="background:linear-gradient(155deg, var(--talavera) 0%, var(--talavera-dark) 100%); color:#08131c;">Entrar</button>
+  <button class="privacy-link-btn mt-4" type="button">Aviso de privacidad</button>
+  </div>
+</div>
+
+<!-- PANEL PRINCIPAL -->
+<div id="mainScreen" class="hidden min-h-screen flex flex-col items-center pb-24">
+
+  <!-- Barra superior -->
+  <header class="sticky top-0 z-40 w-full flex justify-center px-4 pt-[env(safe-area-inset-top)]" style="background:color-mix(in srgb, var(--canvas) 88%, transparent); backdrop-filter: blur(10px); border-bottom:1px solid var(--border-soft);">
+    <div class="w-full max-w-3xl flex items-center justify-between gap-2 py-2.5">
+      <button id="backToPinBtn" aria-label="Volver a poner PIN" class="btn-lift flex items-center justify-center w-9 h-9 rounded-full shrink-0" style="background:var(--surface-2); border:1px solid var(--border); color:var(--ink);">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      </button>
+
+      <!-- Avatar + nombre -->
+      <div class="flex-1 min-w-0 flex items-center gap-2">
+        <div id="avatarWrapper" class="avatar-wrapper" title="Haz clic para personalizar tu perfil">
+          <img id="driverAvatar" src="" alt="Avatar" style="display:none;">
+          <i id="avatarDefaultIcon" data-lucide="user" class="avatar-default"></i>
+          <span class="avatar-hint">✎</span>
+        </div>
+        <div class="min-w-0">
+          <div id="nameDisplayRow" class="flex items-center gap-1.5 min-w-0">
+            <span id="headerShiftDot" class="hidden w-2 h-2 rounded-full shrink-0" style="background:var(--agave); box-shadow:0 0 0 3px var(--agave-glow);"></span>
+            <h1 id="headerDriverName" class="font-display font-bold text-base truncate leading-tight">Panel del Conductor</h1>
+          </div>
+          <p id="headerDriverSub" class="hidden text-[11px] font-mono leading-tight" style="color:var(--ink-soft);"></p>
+        </div>
+      </div>
+
+      <button id="installBtn" aria-label="Instalar app" class="btn-lift hidden items-center gap-1.5 px-3 h-9 rounded-full font-display font-semibold text-[12px] shrink-0" style="background:linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%); color:#1b1002;">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+      </button>
+      <span id="syncStatusChip" class="hidden shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full" style="background:var(--alerta-bg); color:var(--alerta);"></span>
+      <button class="theme-toggle-btn btn-lift flex items-center justify-center w-9 h-9 rounded-full shrink-0" aria-label="Cambiar a tema claro/oscuro" style="background:var(--surface-2); border:1px solid var(--border); color:var(--ink);">
+        <span class="theme-icon-sun flex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
+        <span class="theme-icon-moon flex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="w-full flex flex-col items-center px-4 pt-5 md:pt-8 max-w-3xl">
+
+    <div id="toggleRow">
+      <button id="toggleBtn">
+        <span class="pulseDot"><i id="toggleDotIcon" data-lucide="power"></i></span>
+        <span id="toggleLabel" class="text-sm">Encender<br>ubicación</span>
+      </button>
+      <!-- La tarjeta "Mi horario de hoy" (tarjeta-conductor.js) se inserta
+           aquí, al lado del botón, para que quepa bien en celular. -->
+    </div>
+    <p id="statusText" class="text-sm mt-4 text-center max-w-xs" style="color:var(--ink-soft);">
+      Presiona el botón para que tu combi esté en tiempo real en el mapa.
+    </p>
+
+    <div id="supabaseWarning" class="hidden placard p-4 mt-5 max-w-sm w-full text-sm text-center" style="border-color:var(--alerta); background:var(--alerta-bg); color:var(--alerta);">
+      Supabase no está configurado todavía. Revisa tu archivo de configuración.
+    </div>
+
+    <button id="checkpointBtn" class="btn-lift w-full max-w-sm mt-7 py-4 rounded-2xl font-display font-semibold text-[15px] flex items-center justify-center gap-2" style="background:linear-gradient(155deg, var(--agave) 0%, var(--agave-dark) 100%); color:#052414;">
+      <i data-lucide="flag" class="w-4 h-4"></i> <span id="checkpointBtnLabel">Salí de base San Simón</span>
+    </button>
+    <p id="checkpointSavedText" class="text-xs mt-2 hidden flex items-center gap-1.5" style="color:var(--agave);"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Reportado. El dueño y el checador ya lo ven.</p>
+
+    <div class="grid grid-cols-2 gap-2.5 w-full max-w-sm mt-5">
+      <button id="turnoBtn" class="btn-lift py-3 rounded-2xl font-display font-semibold text-[13px] leading-tight" style="background:linear-gradient(155deg, var(--talavera) 0%, var(--talavera-dark) 100%); color:#08131c;">Iniciar<br>mi turno</button>
+      <button id="reposoBtn" class="btn-lift py-3 rounded-2xl font-display font-semibold text-[13px] leading-tight" style="background:linear-gradient(155deg, var(--cempasuchil) 0%, var(--cempasuchil-dark) 100%); color:#1b1002;">Marcar<br>reposo</button>
+    </div>
+    <p id="turnoReposoStatus" class="text-[11px] mt-2 text-center hidden" style="color:var(--ink-soft);"></p>
+
+    <div class="w-full max-w-sm mt-5">
+      <p id="ramalLabel" class="text-[11px] uppercase tracking-wide mb-1.5 px-1" style="color:var(--ink-faint);">Tu ramal hoy</p>
+      <div class="grid grid-cols-2 gap-2.5">
+        <button class="ramal-btn" data-route="capilla">Por Capilla</button>
+        <button class="ramal-btn" data-route="secundaria">Por Secundaria</button>
+      </div>
+    </div>
+
+    <div class="w-full max-w-sm mt-6 text-[11px] font-mono flex items-center justify-between px-1" style="color:var(--ink-faint);">
+      <span id="coordsText">—</span>
+      <span id="updatedText">—</span>
+    </div>
+
+    <p class="text-[11px] mt-5 text-center max-w-sm flex items-start gap-1.5 justify-center" style="color:var(--ink-faint);">
+      <i data-lucide="lightbulb" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+      <span>Deja la pantalla encendida y el navegador abierto mientras manejas. Si cierras esta página, tu ubicación se apaga sola.</span>
+    </p>
+    <p class="text-[11px] mt-2 mb-2 text-center max-w-sm flex items-start gap-1.5 justify-center" style="color:var(--ink-faint);">
+      <i data-lucide="siren" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+      <span>¿Emergencia? Botón rojo de abajo a la derecha.</span>
+    </p>
+    <button class="privacy-link-btn mt-1" type="button">Aviso de privacidad</button>
+  </div>
+</div>
+
+<button id="panicBtn" aria-label="Botón de ayuda"><i data-lucide="siren" class="w-6 h-6"></i></button>
+
+<div id="panicOverlay">
+  <div id="panicSheet">
+    <div id="panicStepAsk">
+      <p class="font-display font-semibold text-lg flex items-center gap-2" style="color:var(--alerta);"><i data-lucide="siren"></i> ¿Necesitas ayuda?</p>
+      <p class="text-[13px] mt-1.5" style="color:var(--ink-soft);">
+        Se mandará tu ubicación y tu nombre al dueño de la ruta como alerta de emergencia.
+      </p>
+      <div class="flex gap-2.5 mt-4">
+        <button id="panicCancelBtn" class="btn-lift flex-1 py-3 rounded-2xl font-display font-semibold text-sm placard">Cancelar</button>
+        <button id="panicConfirmBtn" class="btn-lift flex-1 py-3 rounded-2xl font-display font-semibold text-sm" style="background:linear-gradient(155deg, var(--alerta) 0%, var(--alerta-dark) 100%); color:#fff;">Sí, pedir ayuda</button>
+      </div>
+    </div>
+    <div id="panicStepSent" class="hidden">
+      <p class="font-display font-semibold text-lg flex items-center gap-2" style="color:var(--agave);"><i data-lucide="check-circle-2"></i> Alerta enviada</p>
+      <p id="panicSentDetail" class="text-[13px] mt-1.5" style="color:var(--ink-soft);">
+        Tu ubicación se envió al panel del dueño y del checador.
+      </p>
+      <div class="flex gap-2.5 mt-4">
+        <button id="panicCloseBtn" class="btn-lift w-full py-3 rounded-2xl font-display font-semibold text-sm placard">Cerrar</button>
+      </div>
+    </div>
+    <div id="panicStepError" class="hidden">
+      <p class="font-display font-semibold text-lg" style="color:var(--alerta);">Sin señal por el momento</p>
+      <p class="text-[13px] mt-1.5" style="color:var(--ink-soft);">Tu alerta se sigue intentando enviar sola cada pocos segundos hasta que salga.</p>
+      <div class="flex gap-2.5 mt-4">
+        <button id="panicErrorCloseBtn" class="btn-lift w-full py-3 rounded-2xl font-display font-semibold text-sm placard">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SELECCIÓN DE UNIDAD -->
+<div id="unitPickerOverlay">
+  <div id="unitPickerSheet">
+    <p class="font-display font-semibold text-lg flex items-center gap-2" style="color:var(--talavera);"><i data-lucide="bus"></i> ¿En qué unidad andas hoy?</p>
+    <p class="text-[13px] mt-1.5" style="color:var(--ink-soft);">Elige tu unidad para que el dueño y el checador la vean correcta hoy.</p>
+    <div id="unitPickerGrid" class="grid grid-cols-3 gap-2.5 mt-4"></div>
+    <p id="unitPickerEmpty" class="hidden text-sm text-center mt-3" style="color:var(--ink-soft);">No hay unidades activas registradas. Avisa al dueño o al administrador.</p>
+    <button id="unitPickerSkipBtn" class="btn-lift w-full mt-4 py-3 rounded-2xl font-display font-semibold text-sm placard hidden">Continuar sin elegir</button>
+  </div>
+</div>
+
+<!-- ===== MODAL DE PERSONALIZACIÓN DE PERFIL ===== -->
+<div id="profileModalOverlay">
+  <div id="profileModalSheet">
+    <h2 class="font-display font-bold text-lg">Personalización de usuario</h2>
+    <div class="avatar-preview" id="profilePreview">
+      <img id="profilePreviewImg" src="" alt="Vista previa" style="display:none;">
+      <i id="profilePreviewDefault" data-lucide="user" class="default-icon"></i>
+    </div>
+    <div class="profile-actions">
+      <label for="avatarFileInput" class="btn-lift">
+        <i data-lucide="image" class="w-4 h-4"></i> Subir foto (galería o cámara)
+      </label>
+      <input type="file" id="avatarFileInput" accept="image/*">
+      <button id="deleteAvatarBtn" class="btn-lift btn-danger">
+        <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar foto actual
+      </button>
+      <button id="closeProfileModalBtn" class="btn-lift btn-close">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL DE CONFIRMACIÓN PERSONALIZADO ===== -->
+<div id="confirmModalOverlay">
+  <div id="confirmModalSheet">
+    <h3>⚠️ Eliminar foto actual</h3>
+    <p>¿Estás seguro de que quieres eliminar tu foto de perfil actual?</p>
+    <div class="confirm-actions">
+      <button id="confirmCancelBtn" class="btn-confirm-cancel">Cancelar</button>
+      <button id="confirmDeleteBtn" class="btn-confirm-danger">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL DE SALUDO (bienvenida) ===== -->
+<div id="welcomeOverlay">
+  <div id="welcomeCard">
+    <div class="welcome-icon">
+      <i data-lucide="bus"></i>
+    </div>
+    <h2 id="welcomeGreeting">¡Qué gusto verte, <span id="welcomeName">Conductor</span>!</h2>
+    <p>Tu ruta te espera.<br>Que tengas un buen día de servicio.</p>
+    <button class="btn-close-welcome" id="closeWelcomeBtn">¡Vamos!</button>
+    <div class="welcome-sub">Ruta San Simón · R-18</div>
+  </div>
+</div>
+
+<!-- ===== MODAL DE ACTUALIZACIÓN (VERSIONES) ===== -->
+<div id="updateOverlay">
+  <div id="updateCard">
+    <div class="update-icon">
+      <i data-lucide="git-pull-request" class="w-9 h-9"></i>
+    </div>
+    <h2>¡Nueva versión disponible!</h2>
+    <span class="update-version" id="updateVersionDisplay">v1.0</span>
+    <div class="update-changelog" id="updateChangelog">
+      <ul>
+        <!-- Generado desde JS -->
+      </ul>
+    </div>
+    <div class="update-actions">
+      <button class="btn-skip" id="skipUpdateBtn">Omitir</button>
+      <button class="btn-update" id="applyUpdateBtn">Actualizar ahora</button>
+    </div>
+  </div>
+</div>
+<!-- ===== MODAL DE AVISO DE PRIVACIDAD ===== -->
+<div id="privacyOverlay">
+  <div id="privacySheet">
+    <h3>Aviso de Privacidad</h3>
+    <p>Ruta San Simón (R-18) es responsable del tratamiento de tus datos personales, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares.</p>
+
+    <h4>Datos que recabamos</h4>
+    <ul>
+      <li>Nombre del conductor</li>
+      <li>PIN de acceso (credencial)</li>
+      <li>Ubicación en tiempo real de la unidad, mientras la actives</li>
+      <li>Unidad asignada y ramal de la ruta</li>
+      <li>Estatus de turno y reposo</li>
+      <li>Alertas de emergencia (ubicación y nombre al momento de activarse)</li>
+      <li>Fotografía de perfil (opcional, solo si decides subirla)</li>
+    </ul>
+
+    <h4>Para qué los usamos</h4>
+    <p>Para operar y coordinar la ruta en tiempo real, identificar tu unidad en el mapa del dueño y del checador, y poder auxiliarte en caso de una alerta de emergencia.</p>
+
+
+    <h4>Tus derechos</h4>
+    <p>Puedes pedir acceso, corrección o eliminación de tus datos, y dejar de compartir tu ubicación apagando el botón correspondiente o cerrando sesión. Para ejercerlos, contacta al dueño de la ruta.</p>
+
+    <button id="privacyCloseBtn">Cerrar</button>
+  </div>
+</div>
+<!-- ===== INDICADOR DE VERSIÓN EN EL FOOTER ===== -->
+<div id="versionFooter">v1.0</div>
+<script src="cambiarVersion.js"></script>
+
+
+<script>
+  // ============================================================
+  // ===== LÓGICA DE AVATAR PERSONALIZADO =====
+  // ============================================================
+  (function() {
+    const avatarWrapper = document.getElementById('avatarWrapper');
+    const avatarImg = document.getElementById('driverAvatar');
+    const avatarDefault = document.getElementById('avatarDefaultIcon');
+    const profileModal = document.getElementById('profileModalOverlay');
+    const confirmModal = document.getElementById('confirmModalOverlay');
+    const profilePreviewImg = document.getElementById('profilePreviewImg');
+    const profilePreviewDefault = document.getElementById('profilePreviewDefault');
+    const closeProfileBtn = document.getElementById('closeProfileModalBtn');
+    const deleteAvatarBtn = document.getElementById('deleteAvatarBtn');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    const fileInput = document.getElementById('avatarFileInput');
+
+    function loadAvatar() {
+      const stored = localStorage.getItem('driver_avatar');
+      if (stored && stored.startsWith('data:image')) {
+        avatarImg.src = stored;
+        avatarImg.style.display = 'block';
+        avatarDefault.style.display = 'none';
+        profilePreviewImg.src = stored;
+        profilePreviewImg.style.display = 'block';
+        profilePreviewDefault.style.display = 'none';
+      } else {
+        avatarImg.style.display = 'none';
+        avatarDefault.style.display = 'block';
+        profilePreviewImg.style.display = 'none';
+        profilePreviewDefault.style.display = 'block';
+      }
+    }
+
+    function saveAvatar(dataUrl) {
+      if (dataUrl && dataUrl.startsWith('data:image')) {
+        localStorage.setItem('driver_avatar', dataUrl);
+        avatarImg.src = dataUrl;
+        avatarImg.style.display = 'block';
+        avatarDefault.style.display = 'none';
+        profilePreviewImg.src = dataUrl;
+        profilePreviewImg.style.display = 'block';
+        profilePreviewDefault.style.display = 'none';
+      } else {
+        localStorage.removeItem('driver_avatar');
+        avatarImg.style.display = 'none';
+        avatarDefault.style.display = 'block';
+        profilePreviewImg.style.display = 'none';
+        profilePreviewDefault.style.display = 'block';
+      }
+    }
+
+    function openProfileModal() {
+      const stored = localStorage.getItem('driver_avatar');
+      if (stored && stored.startsWith('data:image')) {
+        profilePreviewImg.src = stored;
+        profilePreviewImg.style.display = 'block';
+        profilePreviewDefault.style.display = 'none';
+      } else {
+        profilePreviewImg.style.display = 'none';
+        profilePreviewDefault.style.display = 'block';
+      }
+      profileModal.classList.add('show');
+    }
+
+    function closeProfileModal() { profileModal.classList.remove('show'); }
+    function openConfirmModal() { confirmModal.classList.add('show'); }
+    function closeConfirmModal() { confirmModal.classList.remove('show'); }
+
+    avatarWrapper.addEventListener('click', openProfileModal);
+    closeProfileBtn.addEventListener('click', closeProfileModal);
+    profileModal.addEventListener('click', function(e) {
+      if (e.target === profileModal) closeProfileModal();
+    });
+
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        saveAvatar(ev.target.result);
+        closeProfileModal();
+        fileInput.value = '';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    deleteAvatarBtn.addEventListener('click', function() {
+      closeProfileModal();
+      openConfirmModal();
+    });
+
+    confirmDeleteBtn.addEventListener('click', function() {
+      saveAvatar(null);
+      closeConfirmModal();
+    });
+
+    confirmCancelBtn.addEventListener('click', closeConfirmModal);
+    confirmModal.addEventListener('click', function(e) {
+      if (e.target === confirmModal) closeConfirmModal();
+    });
+
+    loadAvatar();
+    document.getElementById('headerDriverName').textContent = 'Juan Pérez';
+  })();
+
+
+  // ============================================================
+  // ===== LÓGICA DEL SALUDO (con sessionStorage) =====
+  // ============================================================
+  (function() {
+    const mainScreen = document.getElementById('mainScreen');
+    const welcomeOverlay = document.getElementById('welcomeOverlay');
+    const welcomeName = document.getElementById('welcomeName');
+    const closeBtn = document.getElementById('closeWelcomeBtn');
+    const pinSubmit = document.getElementById('pinSubmit');
+
+    let welcomeTimeout = null;
+    let isWelcomeShown = false;
+
+    // Clave para sessionStorage (se borra al cerrar la pestaña)
+    const SESSION_FLAG = 'rss_welcome_shown';
+
+    // Al hacer clic en "Entrar" (login con PIN), borramos la bandera para que el saludo se muestre
+    pinSubmit.addEventListener('click', function() {
+      sessionStorage.removeItem(SESSION_FLAG);
+    });
+
+    function showWelcome() {
+      // Si ya se mostró en esta sesión (recarga), no mostrar de nuevo
+      if (sessionStorage.getItem(SESSION_FLAG)) return;
+      if (isWelcomeShown) return;
+
+      const nameEl = document.getElementById('headerDriverName');
+      let nombre = nameEl ? nameEl.textContent.trim() : 'Conductor';
+      if (nombre === 'Panel del Conductor') nombre = 'Conductor';
+      welcomeName.textContent = nombre;
+
+      welcomeOverlay.classList.remove('fade-out');
+      welcomeOverlay.classList.add('show');
+      isWelcomeShown = true;
+
+      // Marcar como mostrado en esta sesión
+      sessionStorage.setItem(SESSION_FLAG, 'true');
+
+      if (welcomeTimeout) clearTimeout(welcomeTimeout);
+      welcomeTimeout = setTimeout(function() {
+        closeWelcome();
+      }, 2500);
+    }
+
+    function closeWelcome() {
+      if (!isWelcomeShown) return;
+      welcomeOverlay.classList.add('fade-out');
+      setTimeout(function() {
+        welcomeOverlay.classList.remove('show', 'fade-out');
+        isWelcomeShown = false;
+      }, 300);
+      if (welcomeTimeout) {
+        clearTimeout(welcomeTimeout);
+        welcomeTimeout = null;
+      }
+    }
+
+    closeBtn.addEventListener('click', closeWelcome);
+    welcomeOverlay.addEventListener('click', function(e) {
+      if (e.target === welcomeOverlay) closeWelcome();
+    });
+
+    // Observamos cuando mainScreen se vuelve visible
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.attributeName === 'class') {
+          if (!mainScreen.classList.contains('hidden')) {
+            setTimeout(showWelcome, 300);
+          }
+        }
+      });
+    });
+    observer.observe(mainScreen, { attributes: true });
+
+    // Si por casualidad ya está visible (ej. auto-login al recargar)
+    // y la bandera no está, no se mostrará porque la bandera ya fue puesta
+    // al mostrarlo la primera vez. Si la bandera no existe (primer acceso),
+    // se mostrará.
+    if (!mainScreen.classList.contains('hidden')) {
+      setTimeout(showWelcome, 300);
+    }
+  })();
+
+
+  // ============================================================
+  // ===== TOGGLES DE TEMA =====
+  // ============================================================
+  document.querySelectorAll('.theme-toggle-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try{ localStorage.setItem('rss_theme', next); }catch(e){}
+    });
+  });
+  
+</script>
+<script>
+  (function(){
+    var privacyOverlay = document.getElementById('privacyOverlay');
+    document.querySelectorAll('.privacy-link-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){ privacyOverlay.classList.add('show'); });
+    });
+    document.getElementById('privacyCloseBtn').addEventListener('click', function(){
+      privacyOverlay.classList.remove('show');
+    });
+    privacyOverlay.addEventListener('click', function(e){
+      if (e.target === privacyOverlay) privacyOverlay.classList.remove('show');
+    });
+  })();
+</script>
+
+<!-- ===== WALKIE-TALKIE (radio) — botón de hablar directo, sin panel que abrir ===== -->
+<button id="walkiePttBtn" aria-label="Hablar por radio" style="
+  position:fixed; left:16px; bottom:16px; z-index:45;
+  width:64px; height:64px; border-radius:999px; border:none;
+  background:linear-gradient(155deg,#e2571c,#b8420f); color:#fff;
+  font-family:inherit; font-size:10.5px; font-weight:700; letter-spacing:.03em; line-height:1.15; text-align:center;
+  box-shadow:0 10px 24px -8px rgba(0,0,0,.6);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  user-select:none; -webkit-user-select:none; touch-action:none; opacity:.6;
+  transition:opacity .2s ease, transform .1s ease;
+">HABLAR</button>
+
+<iframe id="walkieFrame" title="Radio de la ruta" tabindex="-1" style="
+  position:fixed; left:-9999px; top:-9999px; width:1px; height:1px; border:0; opacity:0; pointer-events:none;
+"></iframe>
+
+<script>
+(function(){
+  var btn = document.getElementById('walkiePttBtn');
+  var frame = document.getElementById('walkieFrame');
+  var loaded = false, pressed = false, pollReady = null;
+
+  function loadFrame(){
+    if(loaded) return;
+    loaded = true;
+    var name = window.__rssWalkieName || 'Conductor';
+    frame.src = 'walkie-widget.html?role=passenger&name=' + encodeURIComponent(name);
+  }
+  // Apaga el radio por completo (cierra la llamada, suelta el micrófono,
+  // deja de recibir/mandar audio) — se usa cuando el conductor apaga su
+  // ubicación (termina turno), para no seguir gastando datos/batería en
+  // segundo plano con el radio abierto sin que nadie lo esté usando. En
+  // cuanto vuelva a tocar HABLAR, se vuelve a conectar solo desde cero.
+  function unloadFrame(){
+    if(!loaded) return;
+    loaded = false;
+    clearInterval(pollReady);
+    frame.src = 'about:blank';
+    btn.style.opacity = '.6';
+  }
+  window.__rssWalkieStop = unloadFrame;
+  function api(){
+    try { return frame.contentWindow && frame.contentWindow.RSSWalkie; } catch(e){ return null; }
+  }
+  function startPress(){
+    pressed = true;
+    btn.style.transform = 'scale(0.94)';
+    loadFrame();
+    var a = api();
+    if(a){ a.setTx(true); }
+    else {
+      clearInterval(pollReady);
+      pollReady = setInterval(function(){
+        var a2 = api();
+        if(a2){ clearInterval(pollReady); if(pressed) a2.setTx(true); }
+      }, 200);
+    }
+  }
+  function endPress(){
+    pressed = false;
+    btn.style.transform = 'scale(1)';
+    clearInterval(pollReady);
+    var a = api();
+    if(a) a.setTx(false);
+  }
+  btn.addEventListener('pointerdown', function(e){ e.preventDefault(); btn.setPointerCapture(e.pointerId); startPress(); });
+  btn.addEventListener('pointerup', endPress);
+  btn.addEventListener('pointercancel', endPress);
+  btn.addEventListener('pointerleave', function(e){ if(e.buttons === 1) endPress(); });
+
+  // Se ve apagado (gris) mientras conecta, y a todo color en cuanto ya está listo.
+  setInterval(function(){
+    var a = api();
+    btn.style.opacity = (a && a.getStatus().connected) ? '1' : '.6';
+  }, 1000);
+})();
+</script>
+
+</body>
+</html>

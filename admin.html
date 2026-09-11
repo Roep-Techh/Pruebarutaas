@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+  (function(){
+    try{
+      var t = localStorage.getItem('rss_theme');
+      document.documentElement.setAttribute('data-theme', (t === 'light') ? 'light' : 'dark');
+    }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0E13">
+<title>Admin · Ruta San Simón (R-18)</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="icon" href="icon-1922.png">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+  }
+}
+</script>
+<script type="module" src="admin-logic.js"></script>
+
+<style>
+  :root[data-theme="dark"]{
+    --canvas:#0A0E13; --surface:#11161D; --surface-2:#171E27; --surface-3:#1D2530;
+    --ink:#EDF1F5; --ink-soft:#8A94A3; --ink-faint:#5C6572;
+    --border:#232B36; --border-soft:#1A212B;
+    --talavera:#3FB0F0; --talavera-dark:#1C86C4; --talavera-glow:rgba(63,176,240,.35);
+    --alerta:#FF5C4D; --alerta-dark:#D93E30; --alerta-bg:rgba(255,92,77,.14);
+    --agave:#2FD98A; --agave-dark:#1FAE6D;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px -12px rgba(0,0,0,.55);
+  }
+  :root[data-theme="light"]{
+    --canvas:#FAF7F0; --surface:#FFFFFF; --surface-2:#F4EEDC; --surface-3:#EDE4C8;
+    --ink:#221B12; --ink-soft:#7C7261; --ink-faint:#9C9280;
+    --border:#E4DBC5; --border-soft:#EFE8D4;
+    --talavera:#0E80BE; --talavera-dark:#0A5F8E; --talavera-glow:rgba(14,128,190,.22);
+    --alerta:#E1483A; --alerta-dark:#B93627; --alerta-bg:rgba(225,72,58,.12);
+    --agave:#1E9E5A; --agave-dark:#147A43;
+    --shadow: 0 1px 2px rgba(34,27,18,.06), 0 10px 26px -14px rgba(34,27,18,.18);
+  }
+  body{ background:var(--canvas); color:var(--ink); font-family:'Plus Jakarta Sans',sans-serif; }
+  .font-display{ font-family:'Sora',sans-serif; }
+  .font-mono{ font-family:'JetBrains Mono',monospace; }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); }
+  .field{ background:var(--surface-2); border:1px solid var(--border); border-radius:10px; color:var(--ink); padding:.55rem .75rem; font-size:.875rem; width:100%; }
+  .field:focus{ outline:none; border-color:var(--talavera); }
+  .btn{ border-radius:10px; padding:.55rem 1rem; font-weight:600; font-size:.875rem; transition:.15s; }
+  .btn-primary{ background:var(--talavera); color:#fff; }
+  .btn-primary:hover{ background:var(--talavera-dark); }
+  .btn-ghost{ background:var(--surface-2); color:var(--ink); border:1px solid var(--border); }
+  .btn-ghost:hover{ background:var(--surface-3); }
+  .btn-danger{ background:var(--alerta-bg); color:var(--alerta); border:1px solid transparent; }
+  .btn-danger:hover{ background:var(--alerta); color:#fff; }
+  .tab-btn{ padding:.6rem 1rem; border-radius:10px; font-weight:600; font-size:.875rem; color:var(--ink-soft); }
+  .tab-btn.active{ background:var(--talavera-glow); color:var(--talavera); }
+  table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+  th{ text-align:left; color:var(--ink-faint); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; padding:.5rem .6rem; border-bottom:1px solid var(--border); }
+  td{ padding:.45rem .6rem; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen" class="min-h-screen flex items-center justify-center p-6">
+  <div class="card w-full max-w-sm p-8">
+    <div class="flex items-center gap-2 mb-1">
+      <i data-lucide="shield-check" class="w-5 h-5" style="color:var(--talavera);"></i>
+      <h1 class="font-display font-bold text-lg">Panel de administración</h1>
+    </div>
+    <p class="text-sm mb-6" style="color:var(--ink-soft);">Ruta San Simón (R-18) · Acceso restringido</p>
+
+    <label class="text-xs font-semibold mb-1 block" style="color:var(--ink-soft);">Correo</label>
+    <input id="emailInput" type="email" class="field mb-3" placeholder="tucorreo@dominio.com" autocomplete="username">
+
+    <label class="text-xs font-semibold mb-1 block" style="color:var(--ink-soft);">Contraseña</label>
+    <input id="passwordInput" type="password" class="field mb-4" placeholder="••••••••" autocomplete="current-password">
+
+    <p id="loginError" class="hidden text-sm mb-3" style="color:var(--alerta);">Correo, contraseña, o permisos incorrectos.</p>
+
+    <button id="loginSubmit" class="btn btn-primary w-full">Entrar</button>
+  </div>
+</div>
+
+<!-- ===== PANEL PRINCIPAL ===== -->
+<div id="mainScreen" class="hidden min-h-screen">
+  <header class="border-b p-4 flex items-center justify-between" style="border-color:var(--border);">
+    <div class="flex items-center gap-2">
+      <i data-lucide="shield-check" class="w-5 h-5" style="color:var(--talavera);"></i>
+      <h1 class="font-display font-bold">Admin · Ruta San Simón</h1>
+    </div>
+    <button id="logoutBtn" class="btn btn-ghost text-xs">Cerrar sesión</button>
+  </header>
+
+  <nav class="flex gap-1 p-3 flex-wrap">
+    <button class="tab-btn active" data-tab="owners">Dueños</button>
+    <button class="tab-btn" data-tab="drivers">Conductores</button>
+    <button class="tab-btn" data-tab="checadores">Checadores</button>
+    <button class="tab-btn" data-tab="units">Unidades</button>
+  </nav>
+
+  <main class="p-4 max-w-5xl mx-auto">
+    <p id="globalMsg" class="hidden text-sm mb-3 px-3 py-2 rounded-lg"></p>
+
+    <!-- ---- DUEÑOS ---- -->
+    <section id="tab-owners" class="tab-panel">
+      <div class="card p-4 mb-4">
+        <h2 class="font-display font-semibold mb-3">Agregar dueño</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input id="ownerFullName" class="field" placeholder="Nombre completo">
+          <input id="ownerPhone" class="field" placeholder="Teléfono" type="tel">
+          <input id="ownerEmail" class="field" placeholder="Correo de acceso" type="email">
+          <input id="ownerPassword" class="field" placeholder="Contraseña temporal" type="text">
+          <select id="ownerRole" class="field">
+            <option value="owner">Dueño</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button id="addOwnerBtn" class="btn btn-primary mt-3">Crear dueño</button>
+      </div>
+      <div class="card p-2 overflow-x-auto">
+        <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Rol</th><th></th></tr></thead>
+        <tbody id="ownersTbody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ---- CONDUCTORES ---- -->
+    <section id="tab-drivers" class="tab-panel hidden">
+      <div class="card p-4 mb-4">
+        <h2 class="font-display font-semibold mb-3">Agregar conductor</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input id="driverName" class="field" placeholder="Nombre">
+          <input id="driverPhone" class="field" placeholder="Teléfono" type="tel">
+          <input id="driverPin" class="field" placeholder="PIN">
+          <input id="driverRoute" class="field" placeholder="Ruta (texto libre, opcional)">
+          <select id="driverUnit" class="field"><option value="">Sin unidad</option></select>
+          <select id="driverOwner" class="field"></select>
+        </div>
+        <button id="addDriverBtn" class="btn btn-primary mt-3">Crear conductor</button>
+      </div>
+      <div class="card p-2 overflow-x-auto">
+        <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>PIN</th><th>Unidad</th><th>Dueño</th><th>Activo</th><th></th></tr></thead>
+        <tbody id="driversTbody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ---- CHECADORES ---- -->
+    <section id="tab-checadores" class="tab-panel hidden">
+      <div class="card p-4 mb-4">
+        <h2 class="font-display font-semibold mb-3">Agregar checador</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input id="checadorName" class="field" placeholder="Nombre">
+          <input id="checadorPhone" class="field" placeholder="Teléfono" type="tel">
+          <input id="checadorPin" class="field" placeholder="PIN">
+        </div>
+        <button id="addChecadorBtn" class="btn btn-primary mt-3">Crear checador</button>
+      </div>
+      <div class="card p-2 overflow-x-auto">
+        <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>PIN</th><th></th></tr></thead>
+        <tbody id="checadoresTbody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ---- UNIDADES ---- -->
+    <section id="tab-units" class="tab-panel hidden">
+      <div class="card p-4 mb-4">
+        <h2 class="font-display font-semibold mb-3">Agregar unidad</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input id="unitNumber" class="field" placeholder="Número de unidad">
+          <select id="unitOwner" class="field"></select>
+        </div>
+        <button id="addUnitBtn" class="btn btn-primary mt-3">Crear unidad</button>
+      </div>
+      <div class="card p-2 overflow-x-auto">
+        <table><thead><tr><th>Unidad</th><th>Dueño</th><th>Activa</th><th></th></tr></thead>
+        <tbody id="unitsTbody"></tbody></table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="cambiarVersion.js"></script>
+</body>
+</html>

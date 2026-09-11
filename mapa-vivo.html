@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script>
+  (function(){
+    try{
+      var t = localStorage.getItem('rss_theme');
+      document.documentElement.setAttribute('data-theme', (t === 'light') ? 'light' : 'dark');
+    }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0E13">
+<title>Mapa en vivo · Ruta San Simón (R-18)</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+  }
+}
+</script>
+<script type="module" src="mapa-vivo-logic.js?v=2"></script>
+
+<style>
+  :root{
+    --canvas:#0A0E13; --surface:#11161D; --surface-2:#171E27; --surface-3:#1D2530;
+    --ink:#EDF1F5; --ink-soft:#8A94A3; --ink-faint:#5C6572;
+    --border:#232B36; --border-soft:#1A212B;
+    --talavera:#3FB0F0; --talavera-dark:#1C86C4;
+    --agave:#2FD98A; --agave-dark:#1FAE6D;
+    --cempasuchil:#FFAE33; --cempasuchil-dark:#E08E12;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px -12px rgba(0,0,0,.55);
+  }
+  html[data-theme="light"]{
+    color-scheme: light;
+    --canvas:#FAF7F0; --surface:#FFFFFF; --surface-2:#F4EEDC; --surface-3:#EDE4C8;
+    --ink:#221B12; --ink-soft:#7C7261; --ink-faint:#9C9280;
+    --border:#E4DBC5; --border-soft:#EFE8D4;
+    --talavera:#0E80BE; --talavera-dark:#0A5F8E;
+    --agave:#1E9E5A; --agave-dark:#147A43;
+    --cempasuchil:#F5900C; --cempasuchil-dark:#CB7208;
+  }
+  .theme-toggle-btn .theme-icon-moon{ display:none; }
+  html[data-theme="light"] .theme-toggle-btn .theme-icon-sun{ display:none; }
+  html[data-theme="light"] .theme-toggle-btn .theme-icon-moon{ display:flex; }
+  *{ -webkit-tap-highlight-color: transparent; box-sizing:border-box; }
+  html, body{ height:100%; margin:0; }
+  body{ background:var(--canvas); color:var(--ink); font-family:'Plus Jakarta Sans', sans-serif; display:flex; flex-direction:column; }
+  .font-display{ font-family:'Sora', sans-serif; letter-spacing:-.01em; }
+  [data-lucide]{ width:18px; height:18px; stroke-width:2.1; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+    padding:.7rem 1.1rem; border-bottom:1px solid var(--border-soft);
+    background:var(--surface); z-index:10; flex-shrink:0;
+  }
+  .btn-icon{
+    width:36px; height:36px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--ink); transition: all .2s ease; flex-shrink:0;
+  }
+  .btn-icon:hover{ border-color:var(--talavera); }
+  #liveDot{ width:8px; height:8px; border-radius:50%; background:var(--agave); box-shadow:0 0 0 4px rgba(47,217,138,.3); flex-shrink:0; }
+  #liveDot.stale{ background:var(--ink-faint); box-shadow:none; }
+  #driverChips::-webkit-scrollbar{ display:none; }
+  .driver-chip{
+    flex-shrink:0; display:flex; align-items:center; gap:.35rem; padding:.35rem .65rem;
+    border-radius:999px; background:var(--surface-2); border:1px solid var(--border);
+    color:var(--ink); font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;
+    transition: all .15s ease; font-family:'Sora', sans-serif;
+  }
+  .driver-chip:hover{ border-color:var(--talavera); transform: translateY(-1px); }
+  .driver-chip:active{ transform: scale(.96); }
+  .driver-chip .chip-dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+  #map{ flex:1 1 auto; width:100%; background:var(--surface-2); filter: saturate(.5) brightness(.62) contrast(1.05) invert(1) hue-rotate(180deg); }
+  html[data-theme="light"] #map{ filter:none; }
+  html[data-theme="light"] .leaflet-popup-content-wrapper, html[data-theme="light"] .leaflet-popup-tip{ filter:none; }
+  .leaflet-container{ font-family:'Plus Jakarta Sans', sans-serif; background:var(--surface-2) !important; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{ background:var(--surface-3); color:var(--ink); filter: invert(1) hue-rotate(180deg); }
+  .leaflet-control-zoom a{ background:var(--surface-3) !important; color:var(--ink) !important; border-color:var(--border) !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex; align-items:center; gap:.65rem; min-width:0; flex:1 1 auto;">
+    <button id="backBtn" class="btn-icon" aria-label="Cerrar mapa"><i data-lucide="arrow-left"></i></button>
+    <div style="min-width:0; flex-shrink:0;">
+      <p class="font-display font-semibold text-sm" style="line-height:1.1;">Mapa en vivo</p>
+      <p style="font-size:11px; color:var(--ink-soft); line-height:1.1; margin-top:2px;">Ruta San Simón · R-18</p>
+    </div>
+    <div id="driverChips" style="display:flex; align-items:center; gap:.4rem; overflow-x:auto; scrollbar-width:none; padding:.15rem 0 .15rem .2rem; min-width:0;"></div>
+  </div>
+  <div style="display:flex; align-items:center; gap:.6rem; flex-shrink:0;">
+    <span style="display:flex; align-items:center; gap:.4rem; font-size:12px; color:var(--ink-soft);">
+      <span id="liveDot"></span> <span id="onlineCountText">— en ruta</span>
+    </span>
+    <button class="theme-toggle-btn btn-icon" aria-label="Cambiar a tema claro/oscuro">
+      <span class="theme-icon-sun" style="display:flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
+      <span class="theme-icon-moon" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+    </button>
+  </div>
+</header>
+
+<div id="map"></div>
+
+<script>
+  document.querySelectorAll('.theme-toggle-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try{ localStorage.setItem('rss_theme', next); }catch(e){}
+    });
+  });
+  document.getElementById('backBtn').addEventListener('click', function(){
+    if (window.history.length > 1) window.history.back();
+    else window.close();
+  });
+</script>
+</body>
+</html>

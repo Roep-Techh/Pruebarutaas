@@ -1,0 +1,26 @@
+{
+  "name": "Conductor · Ruta San Simón (R-18)",
+  "short_name": "Conductor R-18",
+  "description": "Panel del conductor: comparte tu ubicación en vivo y manda alertas de ayuda.",
+  "start_url": "./conductor.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0E13",
+  "theme_color": "#0A0E13",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "icon-1922.png",
+      "sizes": "194x194",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

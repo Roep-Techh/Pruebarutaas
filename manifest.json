@@ -1,0 +1,26 @@
+{
+  "name": "Ruta San Simón · San Simón - San Martín",
+  "short_name": "Ruta San Simón",
+  "description": "Horarios, frecuencia y mapa en vivo de la ruta de combis San Simón - San Martín Texmelucan.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF7F0",
+  "theme_color": "#0E80BE",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "icon-1922.png",
+      "sizes": "194x194",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
