@@ -1122,7 +1122,15 @@ document.getElementById('ratingForm').addEventListener('submit', (e) => {
 
   if (window.__rssSupabase) {
     window.__rssSupabase.from('ratings').insert(entry).then(({ error }) => {
-      if (error) console.error('Error guardando calificación:', error);
+      if (error) {
+        console.error('Error guardando calificación:', error);
+      } else {
+        // Actualizamos el promedio de una vez en este mismo navegador,
+        // sin esperar a que llegue el evento de Realtime (que puede no
+        // llegar si el canal falla o la tabla no está publicada).
+        ratingsCargadas.push({ rating });
+        renderAvgRating(ratingsCargadas);
+      }
       finish();
     });
   } else {
