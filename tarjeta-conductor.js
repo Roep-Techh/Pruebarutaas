@@ -162,7 +162,7 @@ function renderChip(corridas) {
   const yaTerminaron = !corridas.some((c) => c.hora_salida >= now);
   body.innerHTML = `
     <span class="mt-chip-ramal"><span class="mt-dot" style="background:${ramalColorVar(siguiente.ramal)}"></span>${ramalNombre(siguiente.ramal)}</span>
-    <span class="mt-chip-times">${formatHora(siguiente.hora_salida)} <small>sale</small>${yaTerminaron ? ' <small>· ya pasó</small>' : ''}</span>
+    <span class="mt-chip-times">${formatHora(siguiente.hora_salida)} <small>sale de base</small>${yaTerminaron ? ' <small>· ya pasó</small>' : ''}</span>
   `;
 }
 
@@ -191,7 +191,7 @@ function renderHoja(corridas) {
   }).join('');
   body.innerHTML = `
     <table>
-      <thead><tr><th>Ramal</th><th class="mh-th-r">Sales de base</th><th class="mh-th-r">Llegas a base</th></tr></thead>
+      <thead><tr><th>Ramal</th><th class="mh-th-r">Sale de base</th><th class="mh-th-r">Sale del asta</th></tr></thead>
       <tbody>${filas}</tbody>
     </table>
   `;
