@@ -118,9 +118,11 @@ async function aplicarPlantilla(key) {
   if (!plantilla) { alert('Elige primero qué tabla de horarios se va a usar hoy.'); return; }
 
   const slots = cfg.slots || [];
-  const cuposListos = slots.slice(0, plantilla.unidades).filter((s) => s && s.unit_id && s.driver_id).length;
-  if (cuposListos < plantilla.unidades) {
-    alert(`Esta tabla (${plantilla.nombre}) necesita ${plantilla.unidades} unidades con su conductor asignado. Llevas ${cuposListos}.`);
+  // Ya no hay tope: se rota entre TODOS los cupos que tengan unidad Y
+  // conductor puestos, sean menos o más de los que "pide" la tabla.
+  const cuposLlenos = slots.filter((s) => s && s.unit_id && s.driver_id);
+  if (cuposLlenos.length === 0) {
+    alert(`Pon por lo menos una unidad con su conductor para aplicar la tabla ${plantilla.nombre}.`);
     return;
   }
 
@@ -131,8 +133,12 @@ async function aplicarPlantilla(key) {
   const rows = [];
   plantilla.corridas.forEach(([salida, asta], idx) => {
     const existente = existentesPorIdx.get(idx);
-    if (existente && existente.hora_salida < now) return; // ya salió, no se toca
-    const slot = slots[idx % plantilla.unidades];
+    // Solo se protege una corrida pasada si de verdad ya se fue con alguien
+    // (ya tenía conductor). Si quedó vacía (nunca se le asignó nadie),
+    // aplicar la tabla sí la debe poder llenar, aunque la hora ya haya
+    // pasado en el reloj.
+    if (existente && existente.hora_salida < now && existente.driver_id) return;
+    const slot = cuposLlenos[idx % cuposLlenos.length];
     rows.push({
       ramal: key,
       fecha: hoy,
@@ -170,7 +176,7 @@ async function ensureTablasGeneradas() {
   for (const key of RAMALES) {
     const cfg = ramalesConfig[key];
     const plantilla = getPlantilla(key, cfg.plantilla_id);
-    const listoParaAutoAplicar = plantilla && (cfg.slots || []).slice(0, plantilla.unidades).every((s) => s && s.unit_id && s.driver_id);
+    const listoParaAutoAplicar = plantilla && (cfg.slots || []).some((s) => s && s.unit_id && s.driver_id);
     if (corridasPorRamal[key].length === 0 && listoParaAutoAplicar) {
       try {
         await aplicarPlantilla(key);
@@ -238,21 +244,20 @@ function renderHorarios() {
 function nombreRamal(key) { return key === 'capilla' ? 'Por Capilla' : 'Por Secundaria'; }
 
 function renderSlotsPicker(key, plantilla, slots) {
-  const filas = [];
-  for (let i = 0; i < plantilla.unidades; i++) {
-    const slot = slots[i] || {};
-    filas.push(`
-      <div class="hz-slot-row">
-        <span class="hz-slot-num">#${i + 1}</span>
-        <select class="hz-slot-sel" data-ramal="${key}" data-slot="${i}" data-field="unit_id">${unidadOptions(slot.unit_id)}</select>
-        <select class="hz-slot-sel" data-ramal="${key}" data-slot="${i}" data-field="driver_id">${conductorOptions(slot.driver_id, key)}</select>
-      </div>
-    `);
-  }
+  const lista = slots.length ? slots : Array.from({ length: plantilla.unidades }, () => ({ unit_id: null, driver_id: null }));
+  const filas = lista.map((slot, i) => `
+    <div class="hz-slot-row">
+      <span class="hz-slot-num">#${i + 1}</span>
+      <select class="hz-slot-sel" data-ramal="${key}" data-slot="${i}" data-field="unit_id">${unidadOptions(slot.unit_id)}</select>
+      <select class="hz-slot-sel" data-ramal="${key}" data-slot="${i}" data-field="driver_id">${conductorOptions(slot.driver_id, key)}</select>
+      <button type="button" class="hz-slot-quitar" data-action="quitar-cupo" data-ramal="${key}" data-slot="${i}" title="Quitar esta unidad">×</button>
+    </div>
+  `).join('');
   return `
     <div class="hz-slots-wrap">
-      <div class="hz-slots-label">Unidades y conductores de hoy (${plantilla.unidades})</div>
-      <div class="hz-slots-grid">${filas.join('')}</div>
+      <div class="hz-slots-label">Unidades y conductores de hoy (${lista.length})</div>
+      <div class="hz-slots-grid">${filas}</div>
+      <button type="button" class="hz-btn-agregar" data-action="agregar-cupo" data-ramal="${key}">+ Agregar unidad</button>
       <button type="button" class="hz-btn-aplicar" data-action="aplicar-plantilla" data-ramal="${key}">Aplicar tabla ${plantilla.nombre}</button>
     </div>
   `;
@@ -331,8 +336,11 @@ function handlePlantillaChange(e) {
 
   cfg.plantilla_id = nuevaId;
   const cuposAnteriores = cfg.slots || [];
+  // Arranca con tantos cupos como pida la tabla, pero si ya había más
+  // agregados a mano (de una tabla anterior) no se los quita.
+  const nuevoLargo = plantilla ? Math.max(plantilla.unidades, cuposAnteriores.length) : 0;
   cfg.slots = plantilla
-    ? Array.from({ length: plantilla.unidades }, (_, i) => cuposAnteriores[i] || { unit_id: null, driver_id: null })
+    ? Array.from({ length: nuevoLargo }, (_, i) => cuposAnteriores[i] || { unit_id: null, driver_id: null })
     : [];
 
   renderHorarios();
@@ -366,6 +374,23 @@ function handleHorariosSelectChange(e) {
 async function handleHorariosClick(e) {
   const t = e.target.closest('[data-action]');
   if (!t || !document.getElementById('horarios')?.contains(t)) return;
+
+  if (t.dataset.action === 'agregar-cupo') {
+    const key = t.dataset.ramal;
+    const cfg = ramalesConfig[key];
+    cfg.slots = [...(cfg.slots || []), { unit_id: null, driver_id: null }];
+    renderHorarios();
+    return;
+  }
+
+  if (t.dataset.action === 'quitar-cupo') {
+    const key = t.dataset.ramal;
+    const idx = Number(t.dataset.slot);
+    const cfg = ramalesConfig[key];
+    cfg.slots = (cfg.slots || []).filter((_, i) => i !== idx);
+    renderHorarios();
+    return;
+  }
 
   if (t.dataset.action === 'aplicar-plantilla') {
     const textoOriginal = t.textContent;
