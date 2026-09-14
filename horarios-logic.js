@@ -166,7 +166,7 @@ async function aplicarPlantilla(key) {
   }
 
   const { error: cfgErr } = await supabase.from('ramales_config')
-    .upsert({ ramal: key, plantilla_id: plantilla.id, slots }, { onConflict: 'ramal' });
+    .upsert({ ramal: key, nombre: nombreRamal(key), plantilla_id: plantilla.id, slots }, { onConflict: 'ramal' });
   if (cfgErr) console.error('Error guardando la tabla elegida:', cfgErr);
 
   await loadCorridasHoy();
