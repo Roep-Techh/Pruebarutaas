@@ -36,8 +36,19 @@ function formatHora(m) {
   const h = Math.floor(mm / 60), mi = mm % 60;
   return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
 }
-function todayStr() {
+function todayStr() { return fechaStr(diaOperativoDate()); }
+// "Día operativo": la fecha no cambia justo a medianoche, sino hasta las
+// 5:00am — que es cuando de verdad arranca el servicio. Así, lo que se
+// programa para "mañana" en la tarde/noche aparece solo a partir de esa
+// hora, no desde las 12:00am. Entre 12:00am y 4:59am el sistema sigue
+// viendo "hoy" como el día que recién terminó (ya no queda ninguna corrida
+// pendiente ahí de todas formas, el servicio ya cerró).
+function diaOperativoDate() {
   const d = new Date();
+  if (d.getHours() < 5) d.setDate(d.getDate() - 1);
+  return d;
+}
+function fechaStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
@@ -112,6 +123,51 @@ function initCorridasRealtime(onChange) {
 // slot 1, ... y al llegar al último cupo vuelve a empezar por el 0. Lo que
 // ya salió hoy (hora_salida < ahorita) se queda tal cual quedó registrado
 // — nunca se le mueve ni la hora ni el conductor a algo que ya salió.
+function tomorrowStr() {
+  const d = diaOperativoDate();
+  d.setDate(d.getDate() + 1);
+  return fechaStr(d);
+}
+
+// Arma el horario del día siguiente con la tabla y los cupos ya elegidos,
+// sin tocar nada del día de hoy. Como la tarjeta del conductor siempre
+// pregunta "¿qué me toca hoy?", en cuanto cambie la fecha (a medianoche)
+// esto ya va a estar esperando ahí solo — no hace falta que el checador
+// vuelva a entrar temprano a aplicarlo.
+async function programarManana(key) {
+  const cfg = ramalesConfig[key];
+  const plantilla = getPlantilla(key, cfg.plantilla_id);
+  if (!plantilla) { alert('Elige primero qué tabla de horarios se va a usar mañana.'); return; }
+
+  const slots = cfg.slots || [];
+  const cuposLlenos = slots.filter((s) => s && s.unit_id && s.driver_id);
+  if (cuposLlenos.length === 0) {
+    alert(`Pon por lo menos una unidad con su conductor para programar mañana con la tabla ${plantilla.nombre}.`);
+    return;
+  }
+
+  const manana = tomorrowStr();
+  const rows = plantilla.corridas.map(([salida, asta], idx) => {
+    const slot = cuposLlenos[idx % cuposLlenos.length];
+    return {
+      ramal: key,
+      fecha: manana,
+      slot_index: idx,
+      unit_id: slot.unit_id,
+      driver_id: slot.driver_id,
+      hora_salida: salida,
+      hora_llega: asta,
+    };
+  });
+
+  const { error: upErr } = await supabase.from('corridas').upsert(rows, { onConflict: 'ramal,fecha,slot_index' });
+  if (upErr) { console.error('Error programando mañana:', upErr); throw upErr; }
+
+  const { error: cfgErr } = await supabase.from('ramales_config')
+    .upsert({ ramal: key, nombre: nombreRamal(key), plantilla_id: plantilla.id, slots }, { onConflict: 'ramal' });
+  if (cfgErr) console.error('Error guardando la tabla elegida:', cfgErr);
+}
+
 async function aplicarPlantilla(key) {
   const cfg = ramalesConfig[key];
   const plantilla = getPlantilla(key, cfg.plantilla_id);
@@ -259,6 +315,7 @@ function renderSlotsPicker(key, plantilla, slots) {
       <div class="hz-slots-grid">${filas}</div>
       <button type="button" class="hz-btn-agregar" data-action="agregar-cupo" data-ramal="${key}">+ Agregar unidad</button>
       <button type="button" class="hz-btn-aplicar" data-action="aplicar-plantilla" data-ramal="${key}">Aplicar tabla ${plantilla.nombre}</button>
+      <button type="button" class="hz-btn-manana" data-action="programar-manana" data-ramal="${key}">Programar igual para mañana</button>
     </div>
   `;
 }
@@ -400,6 +457,20 @@ async function handleHorariosClick(e) {
       renderHorarios();
     } catch (err) {
       alert('No se pudo aplicar la tabla. Revisa tu conexión e intenta de nuevo.');
+      console.error(err);
+      t.disabled = false; t.textContent = textoOriginal;
+    }
+  }
+
+  if (t.dataset.action === 'programar-manana') {
+    const textoOriginal = t.textContent;
+    t.disabled = true; t.textContent = 'Programando…';
+    try {
+      await programarManana(t.dataset.ramal);
+      t.textContent = '¡Listo, mañana ya quedó! ✓';
+      setTimeout(() => { t.disabled = false; t.textContent = textoOriginal; }, 3000);
+    } catch (err) {
+      alert('No se pudo programar mañana. Revisa tu conexión e intenta de nuevo.');
       console.error(err);
       t.disabled = false; t.textContent = textoOriginal;
     }
