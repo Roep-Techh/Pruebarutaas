@@ -204,9 +204,11 @@
   let localStream = null, peer = null, myRole = null; // myRole: 'host' o 'client'
   let routeCode = null, myName = 'Chofer';
   const peers = new Map(); // solo usado si soy host: peerId -> {call, audioEl}
-  let hostCall = null, hostAudioEl = null; // solo usado si soy client
+  const dataConns = new Map(); // solo usado si soy host: peerId -> DataConnection (para avisar quién habla)
+  let hostCall = null, hostAudioEl = null, hostData = null; // solo usado si soy client
   let hostRetryTimer = null;
   let wakeLock = null;
+  let currentSpeaker = null; // nombre de quien está hablando ahora mismo, o null si nadie
 
   // ---------- Bloqueo de pantalla mientras el radio está activo ----------
   // Esto evita que el celular apague la pantalla solo por inactividad, que es
@@ -256,6 +258,21 @@
     }
   }
 
+  // ---------- Avisar quién está hablando ----------
+  // Cada vez que alguien empieza o suelta HABLAR, se manda su nombre a los
+  // demás. El host reenvía el aviso a todos los conectados (menos a quien lo
+  // mandó). window.RSSWalkie.getStatus().speakerName es lo que consulta tu
+  // botón del panel para mostrarlo arriba.
+  function updateSpeaker(name, on){
+    if(on) currentSpeaker = name;
+    else if(currentSpeaker === name) currentSpeaker = null;
+  }
+  function broadcastSpeaking(fromPid, name, on){
+    dataConns.forEach((conn, pid) => {
+      if(pid !== fromPid && conn.open){ try{ conn.send({ type:'speaking', name, on }); }catch(e){} }
+    });
+  }
+
   const micReady = new Promise((resolve) => {
     navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:16000 }
@@ -303,6 +320,18 @@
       log('Tomaste el puesto de conexión central del canal.');
       requestWakeLock();
       startNoSleepFallback();
+    });
+
+    peer.on('connection', conn => {
+      const pid = conn.peer;
+      conn.on('open', () => { dataConns.set(pid, conn); });
+      conn.on('data', msg => {
+        if(msg && msg.type === 'speaking'){
+          updateSpeaker(msg.name, msg.on);
+          broadcastSpeaking(pid, msg.name, msg.on);
+        }
+      });
+      conn.on('close', () => dataConns.delete(pid));
     });
 
     peer.on('call', call => {
@@ -367,6 +396,8 @@
       codeDisplay.textContent = code;
       hostCall = peer.call(hostId(code), localStream, { metadata: { name: myName } });
       limitarBitrateSaliente(hostCall.peerConnection);
+      hostData = peer.connect(hostId(code));
+      hostData.on('data', msg => { if(msg && msg.type === 'speaking') updateSpeaker(msg.name, msg.on); });
       hostCall.on('stream', remoteStream => {
         hostAudioEl = document.createElement('audio');
         hostAudioEl.autoplay = true; hostAudioEl.playsInline = true;
