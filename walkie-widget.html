@@ -214,17 +214,47 @@
   // corte si la persona bloquea el teléfono a mano con el botón de encendido,
   // ni si cambia a otra app — eso depende del sistema operativo del celular,
   // no del código. Lo que sí ayuda mucho es esto + dejar la pantalla visible.
+  //
+  // IMPORTANTE: este widget vive dentro de un <iframe> oculto en el panel del
+  // conductor. Algunos navegadores NO le dan permiso de Wake Lock a un iframe
+  // a menos que el <iframe> del panel tenga el atributo allow="screen-wake-lock"
+  // (te lo marco abajo en las instrucciones). Si ese permiso no llega, esta
+  // función falla en silencio — por eso agregamos un respaldo aparte que no
+  // depende de ningún permiso especial: un video invisible en bucle infinito,
+  // el mismo truco que usan apps como Uber para no apagar pantalla.
   async function requestWakeLock(){
     try{
       if('wakeLock' in navigator){
         wakeLock = await navigator.wakeLock.request('screen');
         wakeLock.addEventListener('release', () => { wakeLock = null; });
       }
-    }catch(e){ /* el navegador lo puede negar (ej. batería baja); no pasa nada, seguimos igual */ }
+    }catch(e){ /* el navegador lo puede negar; no pasa nada, seguimos con el respaldo de abajo */ }
   }
   document.addEventListener('visibilitychange', async () => {
     if(document.visibilityState === 'visible' && routeCode && !wakeLock) await requestWakeLock();
   });
+
+  // ---------- Respaldo: video invisible en bucle (funciona sin permisos especiales) ----------
+  function startNoSleepFallback(){
+    if(document.getElementById('noSleepVideo')) return;
+    const video = document.createElement('video');
+    video.id = 'noSleepVideo';
+    video.setAttribute('playsinline', '');
+    video.setAttribute('muted', '');
+    video.muted = true;
+    video.loop = true;
+    video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;';
+    // Un video en blanco de 1x1 generado en el momento (no depende de ningún
+    // archivo externo ni de internet aparte del que ya usa el walkie).
+    const canvas = document.createElement('canvas');
+    canvas.width = 2; canvas.height = 2;
+    const stream = canvas.captureStream ? canvas.captureStream(1) : null;
+    if(stream){
+      video.srcObject = stream;
+      document.body.appendChild(video);
+      video.play().catch(()=>{});
+    }
+  }
 
   const micReady = new Promise((resolve) => {
     navigator.mediaDevices.getUserMedia({
@@ -272,6 +302,7 @@
       setStatus('Canal activo — esperando a los demás', true);
       log('Tomaste el puesto de conexión central del canal.');
       requestWakeLock();
+      startNoSleepFallback();
     });
 
     peer.on('call', call => {
@@ -345,6 +376,7 @@
         setStatus('En espera — mantén pulsado para hablar', true);
         log('Conectado al canal "' + code + '".');
         requestWakeLock();
+        startNoSleepFallback();
       });
       hostCall.on('close', () => {
         log('Se perdió la conexión con el punto central. Reintentando…');
