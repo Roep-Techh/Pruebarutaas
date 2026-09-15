@@ -30,6 +30,16 @@
      el cambio, solo hay un parpadeo de "reconectando" de un par de
      segundos.
 
+  4) PANTALLA Y SONIDO DE RADIO.
+     Mientras el radio está activo, se pide al celular que no apague la
+     pantalla solo (Screen Wake Lock). Esto ayuda mucho, pero OJO: no es
+     mágico — si el chofer bloquea el teléfono a mano con el botón de
+     encendido o cambia de app, el sistema operativo del celular puede
+     cortar la llamada de todos modos. Eso ya no depende del código, sino
+     de cada celular. Además, cada vez que alguien suelta el botón de
+     hablar, se manda un aviso a todos los conectados para que a todos
+     les suene el "clic" de radio (squelch), no solo a quien habló.
+
   ============================================================================
 -->
 
@@ -196,8 +206,55 @@
   let localStream = null, peer = null, myRole = null; // myRole: 'host' o 'client'
   let routeCode = null, myName = 'Chofer';
   const peers = new Map(); // solo usado si soy host: peerId -> {call, audioEl}
-  let hostCall = null, hostAudioEl = null; // solo usado si soy client
+  const dataConns = new Map(); // solo usado si soy host: peerId -> DataConnection (para avisar "dejó de hablar")
+  let hostCall = null, hostAudioEl = null, hostData = null; // solo usado si soy client
   let hostRetryTimer = null;
+  let wakeLock = null;
+
+  // ---------- Bloqueo de pantalla mientras el radio está activo ----------
+  // Esto evita que el celular apague la pantalla solo por inactividad, que es
+  // la causa más común de que "se corte" el radio. OJO: esto NO evita que se
+  // corte si la persona bloquea el teléfono a mano con el botón de encendido,
+  // ni si cambia a otra app — eso depende del sistema operativo del celular,
+  // no del código. Lo que sí ayuda mucho es esto + dejar la pantalla visible.
+  async function requestWakeLock(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    }catch(e){ /* el navegador lo puede negar (ej. batería baja); no pasa nada, seguimos igual */ }
+  }
+  document.addEventListener('visibilitychange', async () => {
+    if(document.visibilityState === 'visible' && routeCode && !wakeLock) await requestWakeLock();
+  });
+
+  // ---------- "Clic" de radio al soltar el botón (squelch) ----------
+  let sfxCtx;
+  function playReleaseBeep(){
+    try{
+      sfxCtx = sfxCtx || new (window.AudioContext||window.webkitAudioContext)();
+      const t0 = sfxCtx.currentTime;
+      const osc = sfxCtx.createOscillator(), gain = sfxCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, t0);
+      osc.frequency.exponentialRampToValueAtTime(550, t0 + 0.12);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(0.18, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15);
+      osc.connect(gain).connect(sfxCtx.destination);
+      osc.start(t0); osc.stop(t0 + 0.16);
+    }catch(e){}
+  }
+
+  // Avisa a los demás conectados que alguien soltó el botón, para que a
+  // ellos también les suene el "clic" — no solo a quien habló.
+  function broadcastTxState(fromPid, on){
+    if(myRole !== 'host') return;
+    dataConns.forEach((conn, pid) => {
+      if(pid !== fromPid && conn.open){ try{ conn.send({ type:'tx', on }); }catch(e){} }
+    });
+  }
 
   const micReady = new Promise((resolve) => {
     navigator.mediaDevices.getUserMedia({
@@ -244,6 +301,19 @@
       peerStateEl.textContent = 'CONECTADO (punto central)';
       setStatus('Canal activo — esperando a los demás', true);
       log('Tomaste el puesto de conexión central del canal.');
+      requestWakeLock();
+    });
+
+    peer.on('connection', conn => {
+      const pid = conn.peer;
+      conn.on('open', () => { dataConns.set(pid, conn); });
+      conn.on('data', msg => {
+        if(msg && msg.type === 'tx'){
+          if(!msg.on) playReleaseBeep();
+          broadcastTxState(pid, msg.on);
+        }
+      });
+      conn.on('close', () => dataConns.delete(pid));
     });
 
     peer.on('call', call => {
@@ -308,6 +378,8 @@
       codeDisplay.textContent = code;
       hostCall = peer.call(hostId(code), localStream, { metadata: { name: myName } });
       limitarBitrateSaliente(hostCall.peerConnection);
+      hostData = peer.connect(hostId(code));
+      hostData.on('data', msg => { if(msg && msg.type === 'tx' && !msg.on) playReleaseBeep(); });
       hostCall.on('stream', remoteStream => {
         hostAudioEl = document.createElement('audio');
         hostAudioEl.autoplay = true; hostAudioEl.playsInline = true;
@@ -316,6 +388,7 @@
         peerStateEl.textContent = 'CONECTADO';
         setStatus('En espera — mantén pulsado para hablar', true);
         log('Conectado al canal "' + code + '".');
+        requestWakeLock();
       });
       hostCall.on('close', () => {
         log('Se perdió la conexión con el punto central. Reintentando…');
@@ -360,6 +433,13 @@
     pttBtn.classList.toggle('pressed', on);
     if(myRole === 'client' && hostAudioEl) hostAudioEl.muted = on;
     setStatus(on ? 'TRANSMITIENDO' : (routeCode ? 'En espera — mantén pulsado para hablar' : 'Conectando…'), on ? 'tx' : true);
+
+    if(!on) playReleaseBeep(); // el clic de radio para quien suelta el botón
+    if(myRole === 'host'){
+      broadcastTxState(null, on); // avisa a todos los choferes conectados
+    } else if(myRole === 'client' && hostData && hostData.open){
+      try{ hostData.send({ type: 'tx', on }); }catch(e){}
+    }
   }
   pttBtn.addEventListener('pointerdown', e => { e.preventDefault(); pttBtn.setPointerCapture(e.pointerId); setTx(true); });
   pttBtn.addEventListener('pointerup', () => setTx(false));
