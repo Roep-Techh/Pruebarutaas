@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walkie de prueba · Canal privado</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+
+<!--
+  ============================================================================
+  CÓMO FUNCIONA ESTE ARCHIVO (léelo antes de tocar el código)
+  ============================================================================
+
+  1) EL "ROUTE_ID" NO ES SECRETO.
+     Es solo el nombre de la ruta dentro de tu sistema (ej. "r18-san-simon").
+     Va fijo aquí abajo en CONFIG, o mejor, en tu config.json de cada ruta.
+     No pasa nada si alguien lo ve — es como el nombre de una sucursal.
+
+  2) EL CÓDIGO DE CANAL SÍ ES PRIVADO.
+     Nunca está escrito en este archivo. Se pide a Supabase en tiempo real
+     con fetchChannelCode(), usando el ROUTE_ID de arriba. Si no tienes
+     Supabase conectado todavía, este archivo cae solo a un "modo de
+     prueba" con un código fijo (ver DEMO_FALLBACK_CODE) para que puedas
+     probarlo ahora mismo con dos pestañas o dos celulares.
+
+  3) NO HAY "DUEÑO" NI PANEL EN ESTA VERSIÓN.
+     Los 22 choferes son iguales entre sí: el primero que entra se
+     convierte en punto de conexión (host) sin que nadie lo elija a mano,
+     y si ese se desconecta, el que sigue toma su lugar solo. Nadie nota
+     el cambio, solo hay un parpadeo de "reconectando" de un par de
+     segundos.
+
+  ============================================================================
+-->
+
+<script type="module">
+  // ---------------------------------------------------------------------
+  // PASO SIGUIENTE (cuando ya tengas Supabase real conectado):
+  // descomenta esta línea y borra el bloque DEMO de abajo.
+  // import { supabase as sb } from './supabase-config.js';
+  // window.__walkieSupabase = sb;
+</script>
+
+<style>
+  :root{
+    --bg:#1a1c16; --panel:#23261f; --metal:#33362c;
+    --olive:#4a5842; --olive-light:#6b7a5e;
+    --orange:#e2571c; --orange-dark:#b8420f;
+    --lcd:#20301f; --lcd-text:#8fd66a; --lcd-dim:#3f5a3a;
+    --paper:#e8e4d8; --red:#c8362a;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; min-height:100vh; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    color:var(--paper); padding:32px 16px;
+  }
+  .radio{
+    width:320px; background:var(--panel); border-radius:20px;
+    padding:20px 18px 26px; border:1px solid #14150f;
+    box-shadow:0 24px 50px -18px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .brand{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+  .brand b{ font-size:13px; letter-spacing:.08em; }
+  .brand span{ font-size:9px; color:var(--olive-light); letter-spacing:.1em; }
+
+  .screen{
+    background:var(--lcd); border-radius:8px; padding:12px 14px;
+    font-family:Consolas,'Courier New',monospace;
+    box-shadow:inset 0 3px 10px rgba(0,0,0,.6); margin-bottom:14px;
+  }
+  .screen .row{ display:flex; justify-content:space-between; font-size:10px; color:var(--lcd-dim); margin-bottom:4px; letter-spacing:.06em; }
+  .screen .code{ font-size:20px; color:var(--lcd-text); letter-spacing:.06em; }
+  .screen .status{ margin-top:8px; font-size:11px; color:var(--lcd-text); display:flex; align-items:center; gap:7px; min-height:14px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--lcd-dim); flex-shrink:0; }
+  .dot.on{ background:var(--lcd-text); box-shadow:0 0 6px var(--lcd-text); }
+  .dot.tx{ background:var(--orange); box-shadow:0 0 8px var(--orange); }
+  .dot.warn{ background:var(--red); box-shadow:0 0 8px var(--red); }
+
+  .field{ margin-bottom:12px; display:none; }
+  .field.show{ display:block; }
+  .field label{ display:block; font-size:9.5px; letter-spacing:.1em; color:var(--olive-light); margin-bottom:4px; }
+  .field input{
+    width:100%; background:var(--metal); border:1px solid #16170f; border-radius:6px;
+    padding:9px 10px; color:var(--paper); font-family:Consolas,monospace; font-size:13px; outline:none;
+  }
+
+  .ptt-wrap{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:6px; }
+  .ptt{
+    width:140px; height:140px; border-radius:50%;
+    background:radial-gradient(circle at 35% 28%, var(--orange), var(--orange-dark) 70%);
+    border:6px solid #191a13; box-shadow:0 10px 0 #7a2c08, 0 14px 24px rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none; touch-action:none;
+    transition:transform .05s, box-shadow .05s, opacity .15s;
+  }
+  .ptt-label{ font-size:14px; font-weight:800; letter-spacing:.08em; color:#2b1204; text-align:center; line-height:1.3; }
+  .ptt.pressed{ transform:translateY(8px); box-shadow:0 2px 0 #7a2c08, 0 4px 10px rgba(0,0,0,.5); }
+  .ptt-hint{ font-size:9.5px; color:#6a6d5c; text-align:center; letter-spacing:.02em; }
+
+  .log{
+    margin-top:14px; font-family:Consolas,monospace; font-size:10px; color:#6a6d5c;
+    max-height:70px; overflow-y:auto; line-height:1.6; border-top:1px dashed #33362c; padding-top:8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="radio">
+  <div class="brand"><b id="brandName">WALKIE · PRUEBA</b><span>CANAL PRIVADO</span></div>
+
+  <div class="screen">
+    <div class="row"><span>RUTA</span><span id="peerState">SIN CONECTAR</span></div>
+    <div class="code" id="codeDisplay">— — — —</div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Iniciando…</span></div>
+  </div>
+
+  <!-- Solo para probarlo tú mismo sin Supabase todavía: escribe tu nombre -->
+  <div class="field show" id="nameField">
+    <label for="nameInput">Tu nombre (solo para la prueba)</label>
+    <input id="nameInput" type="text" placeholder="Ej: Chofer 3" maxlength="20" value="">
+  </div>
+
+  <div class="ptt-wrap">
+    <div class="ptt" id="pttBtn"><div class="ptt-label">PULSAR<br>PARA<br>HABLAR</div></div>
+    <div class="ptt-hint" id="pttHint">Mantén presionado mientras hablas</div>
+  </div>
+
+  <div class="log" id="log"></div>
+</div>
+
+<div id="audioContainer" style="display:none;"></div>
+
+<script type="module">
+(async function(){
+  // ==========================================================================
+  // CONFIG — esto es lo único "fijo" en el archivo, y no es secreto.
+  // ==========================================================================
+  const CONFIG = {
+    ROUTE_ID: 'r18-san-simon-prueba',   // identificador de tu ruta, no el código del canal
+    DEMO_FALLBACK_CODE: 'DEMO18'         // se usa SOLO si no hay Supabase conectado (ver abajo)
+  };
+
+  const $ = id => document.getElementById(id);
+  const codeDisplay = $('codeDisplay'), peerStateEl = $('peerState'), statusDot = $('statusDot'),
+        statusText = $('statusText'), pttBtn = $('pttBtn'), pttHint = $('pttHint'),
+        logEl = $('log'), audioContainer = $('audioContainer'), nameInput = $('nameInput');
+
+  function log(msg){
+    const line = document.createElement('div');
+    line.textContent = '> ' + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setStatus(text, mode){
+    statusText.textContent = text;
+    statusDot.className = 'dot' + (mode === 'tx' ? ' tx' : mode === 'warn' ? ' warn' : (mode ? ' on' : ''));
+  }
+  function normalizeCode(str){ return (str||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+  // ==========================================================================
+  // PASO 1 (ya resuelto en este demo): leer el código SIN escribirlo aquí.
+  //
+  // Cuando conectes Supabase de verdad, esta función queda así:
+  //
+  //   async function fetchChannelCode(routeId){
+  //     const { data, error } = await window.__walkieSupabase
+  //       .from('walkie_channels')
+  //       .select('code')
+  //       .eq('route_id', routeId)
+  //       .single();
+  //     if(error || !data) return null;
+  //     return normalizeCode(data.code);
+  //   }
+  //
+  // Por ahora, como estamos probando, cae al código de demo si no hay
+  // Supabase — así puedes probar el walkie ahorita mismo, hoy, sin base
+  // de datos, y mañana solo quitas este "if" y queda en producción.
+  // ==========================================================================
+  async function fetchChannelCode(routeId){
+    if(window.__walkieSupabase){
+      try{
+        const { data, error } = await window.__walkieSupabase
+          .from('walkie_channels')
+          .select('code')
+          .eq('route_id', routeId)
+          .single();
+        if(error || !data) { log('No se pudo leer el código de Supabase, usando modo prueba.'); return CONFIG.DEMO_FALLBACK_CODE; }
+        return normalizeCode(data.code);
+      }catch(e){ return CONFIG.DEMO_FALLBACK_CODE; }
+    }
+    return CONFIG.DEMO_FALLBACK_CODE; // modo prueba: sin Supabase todavía
+  }
+
+  const ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+
+  let localStream = null, peer = null, myRole = null; // myRole: 'host' o 'client'
+  let routeCode = null, myName = 'Chofer';
+  const peers = new Map(); // solo usado si soy host: peerId -> {call, audioEl}
+  let hostCall = null, hostAudioEl = null; // solo usado si soy client
+  let hostRetryTimer = null;
+
+  const micReady = new Promise((resolve) => {
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:16000 }
+    }).then(stream => {
+      localStream = stream;
+      localStream.getAudioTracks().forEach(t => t.enabled = false);
+      log('Micrófono listo.');
+      resolve(true);
+    }).catch(err => {
+      setStatus('Sin acceso al micrófono', 'warn');
+      log('Error de micrófono: ' + err.message);
+      resolve(false);
+    });
+  });
+
+  function limitarBitrateSaliente(pc, maxKbps = 20){
+    if(!pc || typeof pc.getSenders !== 'function') return;
+    pc.getSenders().filter(s => s.track && s.track.kind === 'audio').forEach(sender => {
+      try{
+        const params = sender.getParameters();
+        if(!params.encodings || !params.encodings.length) params.encodings = [{}];
+        params.encodings[0].maxBitrate = maxKbps * 1000;
+        sender.setParameters(params).catch(()=>{});
+      }catch(e){}
+    });
+  }
+
+  // ==========================================================================
+  // PASO 2: conectarse al canal — SIN roles de dueño/checador/chofer.
+  // El primero que llega toma el puesto de "host" (solo técnico, nadie lo
+  // nota); todos los demás se conectan a él. Si el host se cae, el
+  // siguiente en la fila reclama el puesto automáticamente.
+  // ==========================================================================
+  function hostId(code){ return 'wtp-host-' + code.toLowerCase(); }
+
+  function tryBecomeHost(code){
+    peer = new Peer(hostId(code), { config: { iceServers: ICE_SERVERS } });
+    myRole = 'host';
+
+    peer.on('open', () => {
+      routeCode = code;
+      codeDisplay.textContent = code;
+      peerStateEl.textContent = 'CONECTADO (punto central)';
+      setStatus('Canal activo — esperando a los demás', true);
+      log('Tomaste el puesto de conexión central del canal.');
+    });
+
+    peer.on('call', call => {
+      const name = (call.metadata && call.metadata.name) || 'Alguien';
+      call.answer(localStream);
+      limitarBitrateSaliente(call.peerConnection);
+      call.on('stream', remoteStream => {
+        const audioEl = document.createElement('audio');
+        audioEl.autoplay = true; audioEl.playsInline = true;
+        audioContainer.appendChild(audioEl);
+        audioEl.srcObject = remoteStream;
+        peers.set(call.peer, { call, audioEl });
+        log(name + ' se unió al canal.');
+        // Reenvía lo que llega de este chofer a todos los demás conectados
+        // (broadcast real: así aunque tú, el host, no hables, los demás sí
+        // se oyen entre sí a través tuyo).
+        rebroadcast(call.peer, remoteStream);
+      });
+      call.on('close', () => { peers.delete(call.peer); log(name + ' salió del canal.'); });
+    });
+
+    peer.on('error', err => {
+      if(err.type === 'unavailable-id'){
+        // Ya hay un host — me conecto como cliente normal.
+        log('Ya hay alguien como punto central, conectándome a él…');
+        if(peer) { try{ peer.destroy(); }catch(e){} }
+        joinAsClient(code);
+      } else {
+        log('Error: ' + err.type);
+        setStatus('Reintentando…', 'warn');
+        scheduleRetry(code);
+      }
+    });
+  }
+
+  // Reenvía el audio de cada chofer a todos los demás conectados al host,
+  // para que sea un canal grupal real y no solo "host habla con cada uno".
+  let audioCtxHost;
+  const broadcastGains = new Map();
+  function rebroadcast(fromPeerId, stream){
+    audioCtxHost = audioCtxHost || new (window.AudioContext||window.webkitAudioContext)();
+    const src = audioCtxHost.createMediaStreamSource(stream);
+    const dest = audioCtxHost.createMediaStreamDestination();
+    src.connect(dest);
+    broadcastGains.set(fromPeerId, dest);
+    peers.forEach((p, pid) => {
+      if(pid !== fromPeerId && p.call && p.call.peerConnection){
+        dest.stream.getAudioTracks().forEach(track => {
+          try{ p.call.peerConnection.addTrack(track, dest.stream); }catch(e){}
+        });
+      }
+    });
+  }
+
+  function joinAsClient(code){
+    myRole = 'client';
+    const myId = 'wtp-' + code.toLowerCase() + '-' + Math.random().toString(36).slice(2,8);
+    peer = new Peer(myId, { config: { iceServers: ICE_SERVERS } });
+
+    peer.on('open', () => {
+      routeCode = code;
+      codeDisplay.textContent = code;
+      hostCall = peer.call(hostId(code), localStream, { metadata: { name: myName } });
+      limitarBitrateSaliente(hostCall.peerConnection);
+      hostCall.on('stream', remoteStream => {
+        hostAudioEl = document.createElement('audio');
+        hostAudioEl.autoplay = true; hostAudioEl.playsInline = true;
+        audioContainer.appendChild(hostAudioEl);
+        hostAudioEl.srcObject = remoteStream;
+        peerStateEl.textContent = 'CONECTADO';
+        setStatus('En espera — mantén pulsado para hablar', true);
+        log('Conectado al canal "' + code + '".');
+      });
+      hostCall.on('close', () => {
+        log('Se perdió la conexión con el punto central. Reintentando…');
+        setStatus('Reconectando…', 'warn');
+        peerStateEl.textContent = 'RECONECTANDO';
+        attemptTakeover(code);
+      });
+    });
+
+    peer.on('error', err => {
+      log('Error: ' + err.type + '. Reintentando…');
+      setStatus('Reconectando…', 'warn');
+      scheduleRetry(code);
+    });
+  }
+
+  // Si el host se cae, cualquier cliente puede intentar tomar su lugar.
+  // Como todos corren la misma función al mismo tiempo, PeerJS solo deja
+  // que UNO gane el ID fijo — los demás automáticamente vuelven a caer en
+  // "conectarme como cliente" apenas ese uno gane.
+  function attemptTakeover(code){
+    if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
+    if(hostAudioEl){ hostAudioEl.remove(); hostAudioEl = null; }
+    setTimeout(() => tryBecomeHost(code), 400 + Math.random()*600); // pequeño azar para no chocar todos a la vez
+  }
+
+  function scheduleRetry(code){
+    if(hostRetryTimer) return;
+    hostRetryTimer = setTimeout(() => {
+      hostRetryTimer = null;
+      if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
+      joinAsClient(code);
+    }, 4000);
+  }
+
+  // ==========================================================================
+  // PTT
+  // ==========================================================================
+  function setTx(on){
+    if(!localStream) return;
+    localStream.getAudioTracks().forEach(t => t.enabled = on);
+    pttBtn.classList.toggle('pressed', on);
+    if(myRole === 'client' && hostAudioEl) hostAudioEl.muted = on;
+    setStatus(on ? 'TRANSMITIENDO' : (routeCode ? 'En espera — mantén pulsado para hablar' : 'Conectando…'), on ? 'tx' : true);
+  }
+  pttBtn.addEventListener('pointerdown', e => { e.preventDefault(); pttBtn.setPointerCapture(e.pointerId); setTx(true); });
+  pttBtn.addEventListener('pointerup', () => setTx(false));
+  pttBtn.addEventListener('pointercancel', () => setTx(false));
+  pttBtn.addEventListener('pointerleave', e => { if(e.buttons === 1) setTx(false); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden) setTx(false); });
+  window.addEventListener('blur', () => setTx(false));
+
+  // ==========================================================================
+  // Arranque
+  // ==========================================================================
+  await micReady;
+  myName = (nameInput.value || 'Chofer').slice(0, 20);
+  nameInput.addEventListener('change', () => { myName = (nameInput.value || 'Chofer').slice(0, 20); });
+
+  setStatus('Buscando el canal…', true);
+  const code = await fetchChannelCode(CONFIG.ROUTE_ID);
+  if(!code){ setStatus('No se pudo obtener el código del canal', 'warn'); log('Revisa la configuración de Supabase.'); return; }
+
+  tryBecomeHost(code);
+})();
+</script>
+
+</body>
+</html>
