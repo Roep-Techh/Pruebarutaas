@@ -1285,66 +1285,7 @@
 "></iframe>
 
 <script>
-(function(){
-  var btn = document.getElementById('walkiePttBtn');
-  var frame = document.getElementById('walkieFrame');
-  var loaded = false, pressed = false, pollReady = null;
 
-  function loadFrame(){
-    if(loaded) return;
-    loaded = true;
-    var name = window.__rssWalkieName || 'Conductor';
-    frame.src = 'walkie-widget.html?role=passenger&name=' + encodeURIComponent(name);
-  }
-  // Apaga el radio por completo (cierra la llamada, suelta el micrófono,
-  // deja de recibir/mandar audio) — se usa cuando el conductor apaga su
-  // ubicación (termina turno), para no seguir gastando datos/batería en
-  // segundo plano con el radio abierto sin que nadie lo esté usando. En
-  // cuanto vuelva a tocar HABLAR, se vuelve a conectar solo desde cero.
-  function unloadFrame(){
-    if(!loaded) return;
-    loaded = false;
-    clearInterval(pollReady);
-    frame.src = 'about:blank';
-    btn.style.opacity = '.6';
-  }
-  window.__rssWalkieStop = unloadFrame;
-  function api(){
-    try { return frame.contentWindow && frame.contentWindow.RSSWalkie; } catch(e){ return null; }
-  }
-  function startPress(){
-    pressed = true;
-    btn.style.transform = 'scale(0.94)';
-    loadFrame();
-    var a = api();
-    if(a){ a.setTx(true); }
-    else {
-      clearInterval(pollReady);
-      pollReady = setInterval(function(){
-        var a2 = api();
-        if(a2){ clearInterval(pollReady); if(pressed) a2.setTx(true); }
-      }, 200);
-    }
-  }
-  function endPress(){
-    pressed = false;
-    btn.style.transform = 'scale(1)';
-    clearInterval(pollReady);
-    var a = api();
-    if(a) a.setTx(false);
-  }
-  btn.addEventListener('pointerdown', function(e){ e.preventDefault(); btn.setPointerCapture(e.pointerId); startPress(); });
-  btn.addEventListener('pointerup', endPress);
-  btn.addEventListener('pointercancel', endPress);
-  btn.addEventListener('pointerleave', function(e){ if(e.buttons === 1) endPress(); });
-
-  // Se ve apagado (gris) mientras conecta, y a todo color en cuanto ya está listo.
-  setInterval(function(){
-    var a = api();
-    btn.style.opacity = (a && a.getStatus().connected) ? '1' : '.6';
-  }, 1000);
-})();
-</script>
 
 </body>
 </html>

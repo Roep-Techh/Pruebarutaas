@@ -3,489 +3,142 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RUTA · Radio de Transporte</title>
+<title>Walkie de prueba · Canal privado</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
-<!-- Este widget se embebe (iframe) dentro de checador.html / conductor.html /
-     dueno.html con ?role=admin|checker|passenger&name=... . Ya no pide correo/
-     contraseña propios: usa la sesión (PIN o login) que la persona ya abrió en su panel.
-     El código de ruta ya no se escribe a mano (excepto el dueño, que lo puede cambiar):
-     se lee y se sincroniza solo desde la tabla walkie_settings en Supabase. -->
+
+<!--
+  ============================================================================
+  CÓMO FUNCIONA ESTE ARCHIVO (léelo antes de tocar el código)
+  ============================================================================
+
+  1) EL "ROUTE_ID" NO ES SECRETO.
+     Es solo el nombre de la ruta dentro de tu sistema (ej. "r18-san-simon").
+     Va fijo aquí abajo en CONFIG, o mejor, en tu config.json de cada ruta.
+     No pasa nada si alguien lo ve — es como el nombre de una sucursal.
+
+  2) EL CÓDIGO DE CANAL SÍ ES PRIVADO.
+     Nunca está escrito en este archivo. Se pide a Supabase en tiempo real
+     con fetchChannelCode(), usando el ROUTE_ID de arriba. Si no tienes
+     Supabase conectado todavía, este archivo cae solo a un "modo de
+     prueba" con un código fijo (ver DEMO_FALLBACK_CODE) para que puedas
+     probarlo ahora mismo con dos pestañas o dos celulares.
+
+  3) NO HAY "DUEÑO" NI PANEL EN ESTA VERSIÓN.
+     Los 22 choferes son iguales entre sí: el primero que entra se
+     convierte en punto de conexión (host) sin que nadie lo elija a mano,
+     y si ese se desconecta, el que sigue toma su lugar solo. Nadie nota
+     el cambio, solo hay un parpadeo de "reconectando" de un par de
+     segundos.
+
+  ============================================================================
+-->
+
 <script type="module">
+  // Usa el mismo archivo de configuración que ya tienes para el resto del
+  // panel — este widget no crea una conexión aparte a Supabase.
   import { supabase as sb } from './supabase-config.js';
-  window.__rssSupabase = sb;
+  window.__walkieSupabase = sb;
 </script>
+
 <style>
   :root{
-    --body-dark:#23261f;
-    --body-darker:#1a1c16;
-    --olive:#4a5842;
-    --olive-light:#6b7a5e;
-    --orange:#e2571c;
-    --orange-dark:#b8420f;
-    --lcd-bg:#20301f;
-    --lcd-text:#8fd66a;
-    --lcd-dim:#3f5a3a;
-    --off-white:#e8e4d8;
-    --metal:#33362c;
-    --red:#c8362a;
-    --red-dark:#8f2016;
+    --bg:#1a1c16; --panel:#23261f; --metal:#33362c;
+    --olive:#4a5842; --olive-light:#6b7a5e;
+    --orange:#e2571c; --orange-dark:#b8420f;
+    --lcd:#20301f; --lcd-text:#8fd66a; --lcd-dim:#3f5a3a;
+    --paper:#e8e4d8; --red:#c8362a;
   }
   *{box-sizing:border-box;}
   html,body{
-    margin:0;
-    min-height:100vh;
-    background:
-      radial-gradient(ellipse at 50% -10%, #3a3d32 0%, transparent 60%),
-      var(--body-darker);
-    display:flex;
-    align-items:flex-start;
-    justify-content:center;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-    color:var(--off-white);
-    padding:32px 16px;
-    gap:20px;
-    flex-wrap:wrap;
+    margin:0; min-height:100vh; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    color:var(--paper); padding:32px 16px;
   }
-
   .radio{
-    width:340px;
-    background:
-      repeating-linear-gradient(180deg, #292c23 0px, #292c23 2px, #26291f 2px, #26291f 4px),
-      var(--body-dark);
-    border-radius:22px;
-    padding:22px 20px 28px;
-    box-shadow:
-      0 30px 60px -20px rgba(0,0,0,.7),
-      inset 0 1px 0 rgba(255,255,255,.06),
-      inset 0 -2px 0 rgba(0,0,0,.4);
-    border:1px solid #14150f;
-    position:relative;
-    flex-shrink:0;
+    width:320px; background:var(--panel); border-radius:20px;
+    padding:20px 18px 26px; border:1px solid #14150f;
+    box-shadow:0 24px 50px -18px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.05);
   }
-
-  .antenna{
-    position:absolute;
-    top:-46px;
-    right:38px;
-    width:6px;
-    height:52px;
-    background:linear-gradient(180deg,#5b5f4f,#2a2c22);
-    border-radius:3px 3px 0 0;
-    box-shadow:0 0 0 1px #14150f;
-  }
-  .antenna::after{
-    content:'';
-    position:absolute;
-    top:-8px; left:-3px;
-    width:12px; height:12px;
-    border-radius:50%;
-    background:radial-gradient(circle at 35% 30%, #8a8e79, #4a4d3f);
-  }
-
-  .brand{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    margin-bottom:14px;
-    padding:0 4px;
-  }
-  .brand-name{
-    font-size:14px;
-    font-weight:800;
-    letter-spacing:.1em;
-    color:var(--off-white);
-  }
-  .brand-tag{
-    font-size:9px;
-    letter-spacing:.12em;
-    color:var(--olive-light);
-  }
+  .brand{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+  .brand b{ font-size:13px; letter-spacing:.08em; }
+  .brand span{ font-size:9px; color:var(--olive-light); letter-spacing:.1em; }
 
   .screen{
-    background:var(--lcd-bg);
-    border-radius:8px;
-    padding:14px 16px;
-    box-shadow:inset 0 3px 10px rgba(0,0,0,.6), inset 0 0 0 1px #14200f;
-    font-family:'SFMono-Regular',Consolas,'Courier New',monospace;
-    margin-bottom:16px;
-  }
-  .screen-row{
-    display:flex;
-    justify-content:space-between;
-    font-size:11px;
-    color:var(--lcd-dim);
-    letter-spacing:.08em;
-    margin-bottom:6px;
-  }
-  .channel-code{
-    font-size:24px;
-    color:var(--lcd-text);
-    letter-spacing:.06em;
-    text-shadow:0 0 8px rgba(143,214,106,.5);
-    line-height:1.1;
-  }
-  .status-line{
-    margin-top:8px;
-    font-size:12px;
-    letter-spacing:.06em;
-    color:var(--lcd-text);
-    display:flex;
-    align-items:center;
-    gap:8px;
-    min-height:16px;
-  }
-  .status-dot{
-    width:7px;height:7px;border-radius:50%;
-    background:var(--lcd-dim);
-    flex-shrink:0;
-  }
-  .status-dot.on{background:var(--lcd-text);box-shadow:0 0 6px var(--lcd-text);}
-  .status-dot.tx{background:var(--orange);box-shadow:0 0 8px var(--orange);}
-  .status-dot.warn{background:var(--red);box-shadow:0 0 8px var(--red);}
-
-  .vu{
-    display:flex;
-    gap:3px;
-    margin-top:10px;
-    height:14px;
-    align-items:flex-end;
-  }
-  .vu-bar{
-    width:5px;
-    background:var(--lcd-dim);
-    border-radius:1px;
-    height:20%;
-    transition:height .06s linear, background .06s linear;
-  }
-
-  .roles{
-    display:flex;
-    gap:6px;
-    margin-bottom:14px;
-  }
-  .role-btn{
-    flex:1;
-    background:var(--metal);
-    border:1px solid #16170f;
-    border-radius:6px;
-    color:var(--olive-light);
-    font-size:9.5px;
-    font-weight:700;
-    letter-spacing:.05em;
-    padding:10px 4px;
-    cursor:pointer;
-  }
-  .role-btn.active{
-    background:var(--olive);
-    color:var(--off-white);
-  }
-
-  .field{margin-bottom:12px;}
-  .field label{
-    display:block;
-    font-size:10px;
-    letter-spacing:.12em;
-    color:var(--olive-light);
-    margin-bottom:5px;
-    font-weight:700;
-  }
-  .field input{
-    width:100%;
-    background:var(--metal);
-    border:1px solid #16170f;
-    border-radius:6px;
-    padding:10px 12px;
-    color:var(--off-white);
+    background:var(--lcd); border-radius:8px; padding:12px 14px;
     font-family:Consolas,'Courier New',monospace;
-    font-size:14px;
-    letter-spacing:.05em;
-    outline:none;
+    box-shadow:inset 0 3px 10px rgba(0,0,0,.6); margin-bottom:14px;
   }
-  .field input:focus{box-shadow:0 0 0 2px var(--olive-light);}
-  .field input::placeholder{color:#6a6d5c;}
-  .field small{
-    display:block;
-    margin-top:5px;
-    font-size:9.5px;
-    color:#6a6d5c;
-    letter-spacing:.02em;
-    line-height:1.4;
+  .screen .row{ display:flex; justify-content:space-between; font-size:10px; color:var(--lcd-dim); margin-bottom:4px; letter-spacing:.06em; }
+  .screen .code{ font-size:20px; color:var(--lcd-text); letter-spacing:.06em; }
+  .screen .status{ margin-top:8px; font-size:11px; color:var(--lcd-text); display:flex; align-items:center; gap:7px; min-height:14px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--lcd-dim); flex-shrink:0; }
+  .dot.on{ background:var(--lcd-text); box-shadow:0 0 6px var(--lcd-text); }
+  .dot.tx{ background:var(--orange); box-shadow:0 0 8px var(--orange); }
+  .dot.warn{ background:var(--red); box-shadow:0 0 8px var(--red); }
+
+  .field{ margin-bottom:12px; display:none; }
+  .field.show{ display:block; }
+  .field label{ display:block; font-size:9.5px; letter-spacing:.1em; color:var(--olive-light); margin-bottom:4px; }
+  .field input{
+    width:100%; background:var(--metal); border:1px solid #16170f; border-radius:6px;
+    padding:9px 10px; color:var(--paper); font-family:Consolas,monospace; font-size:13px; outline:none;
   }
 
-  .login-status{
-    font-size:10.5px;
-    color:var(--red);
-    min-height:14px;
-    margin:-4px 0 10px;
-    letter-spacing:.02em;
-  }
-
-  .row-btns{display:flex;gap:8px;margin-bottom:14px;}
-  .btn-small{
-    flex:1;
-    background:var(--olive);
-    border:1px solid #14150f;
-    border-radius:6px;
-    color:var(--off-white);
-    font-size:11px;
-    font-weight:700;
-    letter-spacing:.08em;
-    padding:11px 6px;
-    cursor:pointer;
-    transition:background .15s;
-  }
-  .btn-small:hover{background:var(--olive-light);}
-  .btn-small:active{transform:translateY(1px);}
-  .btn-small:disabled{opacity:.4;cursor:not-allowed;}
-  .btn-small.danger{background:var(--red-dark);}
-  .btn-small.danger:hover{background:var(--red);}
-
-  .ptt-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .ptt-wrap{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:6px; }
   .ptt{
-    width:150px;height:150px;border-radius:50%;
+    width:140px; height:140px; border-radius:50%;
     background:radial-gradient(circle at 35% 28%, var(--orange), var(--orange-dark) 70%);
-    border:6px solid #191a13;
-    box-shadow:0 10px 0 #7a2c08, 0 14px 24px rgba(0,0,0,.5), inset 0 2px 4px rgba(255,255,255,.25);
-    display:flex;align-items:center;justify-content:center;
-    cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;
+    border:6px solid #191a13; box-shadow:0 10px 0 #7a2c08, 0 14px 24px rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none; touch-action:none;
     transition:transform .05s, box-shadow .05s, opacity .15s;
   }
-  .ptt-label{font-size:15px;font-weight:800;letter-spacing:.1em;color:#2b1204;text-align:center;line-height:1.3;}
-  .ptt.pressed{
-    transform:translateY(8px);
-    box-shadow:0 2px 0 #7a2c08, 0 4px 10px rgba(0,0,0,.5), inset 0 2px 4px rgba(0,0,0,.3);
-    background:radial-gradient(circle at 35% 28%, #ff7433, var(--orange-dark) 70%);
-  }
-  .ptt.locked{
-    opacity:.4;
-    cursor:not-allowed;
-    background:radial-gradient(circle at 35% 28%, #7a7a7a, #4a4a4a 70%);
-  }
-  .ptt-hint{font-size:10px;letter-spacing:.1em;color:#6a6d5c;text-align:center;}
+  .ptt-label{ font-size:14px; font-weight:800; letter-spacing:.08em; color:#2b1204; text-align:center; line-height:1.3; }
+  .ptt.pressed{ transform:translateY(8px); box-shadow:0 2px 0 #7a2c08, 0 4px 10px rgba(0,0,0,.5); }
+  .ptt-hint{ font-size:9.5px; color:#6a6d5c; text-align:center; letter-spacing:.02em; }
 
   .log{
-    margin-top:14px;
-    font-family:Consolas,'Courier New',monospace;
-    font-size:10px;
-    color:#6a6d5c;
-    max-height:54px;
-    overflow-y:auto;
-    line-height:1.6;
+    margin-top:14px; font-family:Consolas,monospace; font-size:10px; color:#6a6d5c;
+    max-height:70px; overflow-y:auto; line-height:1.6; border-top:1px dashed #33362c; padding-top:8px;
   }
-
-  /* --- Panel de manifiesto (administrador y checador) --- */
-  .clipboard{
-    width:300px;
-    background:var(--off-white);
-    border-radius:6px;
-    padding:18px 18px 20px;
-    color:#2a2c22;
-    box-shadow:0 30px 60px -20px rgba(0,0,0,.7);
-    flex-shrink:0;
-    display:none;
-  }
-  .clipboard.show{display:block;}
-  .clipboard-clip{
-    width:70px;height:16px;
-    background:linear-gradient(180deg,#8a8e79,#5b5f4f);
-    border-radius:4px;
-    margin:-30px auto 12px;
-    box-shadow:0 3px 6px rgba(0,0,0,.4);
-  }
-  .clipboard h2{
-    font-size:13px;
-    letter-spacing:.1em;
-    margin:0 0 3px;
-    color:#2a2c22;
-  }
-  .clipboard .sub{
-    font-size:10.5px;
-    color:#6b6e5e;
-    margin-bottom:14px;
-  }
-  .roster{list-style:none;margin:0;padding:0;}
-  .roster li{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    padding:9px 0;
-    border-bottom:1px dashed #c7c3b4;
-  }
-  .roster li:last-child{border-bottom:none;}
-  .roster .name{
-    flex:1;
-    font-size:12.5px;
-    font-weight:700;
-    color:#2a2c22;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-  .roster .name .tag{
-    display:block;
-    font-size:9px;
-    font-weight:400;
-    color:#8a8d7a;
-    letter-spacing:.04em;
-  }
-  .roster .mic-dot{
-    width:7px;height:7px;border-radius:50%;
-    background:#c7c3b4;
-    flex-shrink:0;
-  }
-  .roster .mic-dot.speaking{background:var(--orange);box-shadow:0 0 5px var(--orange);}
-  .roster button{
-    border:none;
-    border-radius:4px;
-    font-size:9px;
-    font-weight:700;
-    letter-spacing:.04em;
-    padding:6px 8px;
-    cursor:pointer;
-  }
-  .roster .btn-mute{background:#d8d4c4;color:#2a2c22;}
-  .roster .btn-mute.muted{background:var(--orange);color:#fff;}
-  .roster .btn-kick{background:var(--red-dark);color:#fff;}
-  .empty-roster{font-size:11px;color:#8a8d7a;padding:10px 0;}
-
-  @media (prefers-reduced-motion: reduce){.ptt, .vu-bar{transition:none;}}
 </style>
 </head>
 <body>
 
 <div class="radio">
-  <div class="antenna"></div>
-
-  <div class="brand">
-    <span class="brand-name" id="brandName">RUTA · RADIO</span>
-    <span class="brand-tag">PTT · TRANSPORTE</span>
-  </div>
-
-  <!-- El rol ya no se elige aquí: llega fijo por la URL del iframe
-       (?role=admin|checker|passenger) según qué panel lo abrió. -->
-  <div class="roles" id="roleSelector" style="display:none;">
-    <button class="role-btn active" id="roleAdminBtn">DUEÑO</button>
-    <button class="role-btn" id="roleCheckerBtn">CHECADOR</button>
-    <button class="role-btn" id="rolePassengerBtn">CHOFER</button>
-  </div>
+  <div class="brand"><b id="brandName">WALKIE · PRUEBA</b><span>CANAL PRIVADO</span></div>
 
   <div class="screen">
-    <div class="screen-row"><span id="screenLabel">RUTA</span><span id="peerState">SIN CONECTAR</span></div>
-    <div class="channel-code" id="roomCodeDisplay">— — — — —</div>
-    <div class="status-line">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="statusText">Iniciando micrófono…</span>
-    </div>
-    <div class="vu" id="vu"></div>
-  </div>
-
-  <!-- ===== DUEÑO DE RUTA (administrador) =====
-       Ya no pide correo/contraseña: si esto se abrió, es porque el dueño
-       ya inició sesión en su panel. El código se autocompleta con el que
-       esté guardado en Supabase; solo lo cambia si quiere rotarlo. -->
-  <div id="adminForm">
-    <div id="adminPostLogin">
-      <div class="field">
-        <label for="adminCodeInput">Código de ruta actual</label>
-        <input id="adminCodeInput" type="text" placeholder="Cargando…" autocomplete="off" maxlength="12" readonly>
-        <small>Este es el código que ya escuchan tu checador y tus conductores. Escribe uno nuevo abajo solo si quieres cambiarlo.</small>
-      </div>
-      <div class="field" id="adminNewCodeField" style="display:none;">
-        <label for="adminNewCodeInput">Nuevo código de ruta</label>
-        <input id="adminNewCodeInput" type="text" placeholder="Ej: RUTA18" autocomplete="off" maxlength="12">
-      </div>
-      <div class="row-btns">
-        <button class="btn-small" id="toggleChangeCodeBtn">CAMBIAR CÓDIGO</button>
-        <button class="btn-small" id="confirmChangeCodeBtn" style="display:none;">CONFIRMAR CAMBIO</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== CHECADOR =====
-       Sin login ni código a mano: se conecta solo con el código vigente. -->
-  <div id="checkerForm" style="display:none;">
-    <div id="checkerPostLogin">
-      <p style="font-size:11px;color:var(--olive-light);line-height:1.5;margin:0 0 10px;">Conectando a la ruta automáticamente con el código vigente…</p>
-    </div>
-  </div>
-
-  <!-- ===== CONDUCTOR (chofer) =====
-       Sin login ni código a mano: se conecta solo con el código vigente. -->
-  <div id="passengerForm" style="display:none;">
-    <p style="font-size:11px;color:var(--olive-light);line-height:1.5;margin:0 0 10px;">Conectando a la ruta automáticamente con el código vigente…</p>
-  </div>
-
-  <div class="row-btns" id="leaveRow" style="display:none;">
-    <button class="btn-small danger" id="leaveBtn">SALIR</button>
+    <div class="row"><span>RUTA</span><span id="peerState">SIN CONECTAR</span></div>
+    <div class="code" id="codeDisplay">— — — —</div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Iniciando…</span></div>
   </div>
 
   <div class="ptt-wrap">
-    <div class="ptt" id="pttBtn">
-      <div class="ptt-label" id="pttLabel">PULSAR<br>PARA<br>HABLAR</div>
-    </div>
-    <div class="ptt-hint" id="pttHint">Mantén presionado el botón mientras hablas</div>
+    <div class="ptt" id="pttBtn"><div class="ptt-label">PULSAR<br>PARA<br>HABLAR</div></div>
+    <div class="ptt-hint" id="pttHint">Mantén presionado mientras hablas</div>
   </div>
 
   <div class="log" id="log"></div>
-</div>
-
-<!-- Panel del dueño (control total) -->
-<div class="clipboard" id="clipboard">
-  <div class="clipboard-clip"></div>
-  <h2>MANIFIESTO DE RUTA</h2>
-  <div class="sub" id="rosterSub">0 conectados</div>
-  <ul class="roster" id="rosterList">
-    <li class="empty-roster">Nadie se ha unido todavía.</li>
-  </ul>
-</div>
-
-<!-- Panel del checador (solo lectura) -->
-<div class="clipboard" id="checkerClipboard">
-  <div class="clipboard-clip"></div>
-  <h2>MANIFIESTO DE RUTA</h2>
-  <div class="sub" id="checkerRosterSub">0 conectados</div>
-  <ul class="roster" id="checkerRosterList">
-    <li class="empty-roster">Esperando datos del dueño…</li>
-  </ul>
 </div>
 
 <div id="audioContainer" style="display:none;"></div>
 
 <script type="module">
 (async function(){
+  // ==========================================================================
+  // CONFIG — esto es lo único "fijo" en el archivo, y no es secreto.
+  // ==========================================================================
+  const CONFIG = {
+    ROUTE_ID: 'r18-san-simon-prueba',   // identificador de tu ruta, no el código del canal
+    DEMO_FALLBACK_CODE: 'DEMO18'         // se usa SOLO si no hay Supabase conectado (ver abajo)
+  };
+
   const $ = id => document.getElementById(id);
-  const roomCodeDisplay = $('roomCodeDisplay'), peerStateEl = $('peerState'), statusDot = $('statusDot'),
-        statusText = $('statusText'), pttBtn = $('pttBtn'), pttLabel = $('pttLabel'), pttHint = $('pttHint'),
-        logEl = $('log'), vuEl = $('vu'), audioContainer = $('audioContainer'), screenLabel = $('screenLabel'),
-        brandName = $('brandName'),
-        adminForm = $('adminForm'), adminPostLogin = $('adminPostLogin'),
-        adminCodeInput = $('adminCodeInput'), adminNewCodeField = $('adminNewCodeField'), adminNewCodeInput = $('adminNewCodeInput'),
-        toggleChangeCodeBtn = $('toggleChangeCodeBtn'), confirmChangeCodeBtn = $('confirmChangeCodeBtn'),
-        checkerForm = $('checkerForm'),
-        passengerForm = $('passengerForm'),
-        leaveRow = $('leaveRow'), leaveBtn = $('leaveBtn'),
-        clipboard = $('clipboard'), rosterList = $('rosterList'), rosterSub = $('rosterSub'),
-        checkerClipboard = $('checkerClipboard'), checkerRosterList = $('checkerRosterList'), checkerRosterSub = $('checkerRosterSub');
-
-  // ======================================================================
-  // Identidad y rol: llegan por la URL del iframe, no se piden aquí.
-  //   ?role=admin|checker|passenger&name=NombreDeLaPersona
-  // ======================================================================
-  const params = new URLSearchParams(window.location.search);
-  const role = params.get('role') === 'admin' ? 'admin' : params.get('role') === 'checker' ? 'checker' : 'passenger';
-  const myName = (params.get('name') || (role === 'admin' ? 'Dueño' : role === 'checker' ? 'Checador' : 'Chofer')).slice(0, 20);
-
-  adminForm.style.display = role === 'admin' ? 'block' : 'none';
-  checkerForm.style.display = role === 'checker' ? 'block' : 'none';
-  passengerForm.style.display = role === 'passenger' ? 'block' : 'none';
-  brandName.textContent = role === 'admin' ? ('RUTA · DUEÑO') : role === 'checker' ? ('RUTA · CHECADOR (' + myName + ')') : ('RUTA · ' + myName);
-
-  // Cliente de Supabase de PRUEBAS, cargado como módulo arriba de este archivo.
-  const supabaseClient = window.__rssSupabase || null;
-
-  const BAR_COUNT = 24;
-  for(let i=0;i<BAR_COUNT;i++){ const b=document.createElement('div'); b.className='vu-bar'; vuEl.appendChild(b); }
-  const bars = [...vuEl.children];
+  const codeDisplay = $('codeDisplay'), peerStateEl = $('peerState'), statusDot = $('statusDot'),
+        statusText = $('statusText'), pttBtn = $('pttBtn'), pttHint = $('pttHint'),
+        logEl = $('log'), audioContainer = $('audioContainer');
 
   function log(msg){
     const line = document.createElement('div');
@@ -495,562 +148,252 @@
   }
   function setStatus(text, mode){
     statusText.textContent = text;
-    statusDot.className = 'status-dot' + (mode === 'tx' ? ' tx' : mode === 'warn' ? ' warn' : (mode ? ' on' : ''));
+    statusDot.className = 'dot' + (mode === 'tx' ? ' tx' : mode === 'warn' ? ' warn' : (mode ? ' on' : ''));
   }
   function normalizeCode(str){ return (str||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+  // ==========================================================================
+  // PASO 1 (ya resuelto en este demo): leer el código SIN escribirlo aquí.
+  //
+  // Cuando conectes Supabase de verdad, esta función queda así:
+  //
+  //   async function fetchChannelCode(routeId){
+  //     const { data, error } = await window.__walkieSupabase
+  //       .from('walkie_channels')
+  //       .select('code')
+  //       .eq('route_id', routeId)
+  //       .single();
+  //     if(error || !data) return null;
+  //     return normalizeCode(data.code);
+  //   }
+  //
+  // Por ahora, como estamos probando, cae al código de demo si no hay
+  // Supabase — así puedes probar el walkie ahorita mismo, hoy, sin base
+  // de datos, y mañana solo quitas este "if" y queda en producción.
+  // ==========================================================================
+  async function fetchChannelCode(routeId){
+    if(window.__walkieSupabase){
+      try{
+        const { data, error } = await window.__walkieSupabase
+          .from('walkie_channels')
+          .select('code')
+          .eq('route_id', routeId)
+          .single();
+        if(error || !data) { log('No se pudo leer el código de Supabase, usando modo prueba.'); return CONFIG.DEMO_FALLBACK_CODE; }
+        return normalizeCode(data.code);
+      }catch(e){ return CONFIG.DEMO_FALLBACK_CODE; }
+    }
+    return CONFIG.DEMO_FALLBACK_CODE; // modo prueba: sin Supabase todavía
+  }
 
   const ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
   ];
 
-  let peer = null, localStream = null, routeCode = null;
-  let audioCtx, analyser, micSource, rafId;
-  let mutedByAdmin = false;
+  let localStream = null, peer = null, myRole = null; // myRole: 'host' o 'client'
+  let routeCode = null, myName = 'Chofer';
+  const peers = new Map(); // solo usado si soy host: peerId -> {call, audioEl}
+  let hostCall = null, hostAudioEl = null; // solo usado si soy client
+  let hostRetryTimer = null;
 
-  // ---- Estado exclusivo del dueño (admin) ----
-  let broadcastDest = null, adminMicGain = null;
-  const passengers = new Map(); // peerId -> {name, role, call, dataConn, gainNode, sourceNode, audioEl, muted, speaking}
-
-  // ---- Estado exclusivo de checador / chofer ----
-  let adminCall = null, adminDataConn = null, remoteAudioEl = null;
-
-  function beep(freq, duration){
-    try{
-      const ctx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type='sine'; osc.frequency.value=freq;
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime+0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+duration);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime+duration);
-    }catch(e){}
-  }
-
-  function startVuMeter(stream){
-    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser(); analyser.fftSize = 64;
-    micSource = audioCtx.createMediaStreamSource(stream);
-    micSource.connect(analyser);
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    function tick(){
-      analyser.getByteFrequencyData(data);
-      let sum=0; for(let i=0;i<data.length;i++) sum+=data[i];
-      const level = Math.min(1, (sum/data.length)/90);
-      bars.forEach((bar,i)=>{
-        const active = level > i/bars.length;
-        bar.style.height = active ? (30+Math.random()*70)+'%' : '15%';
-        bar.style.background = active ? (i>bars.length*0.8?'#ff5d33':'var(--lcd-text)') : 'var(--lcd-dim)';
-      });
-      rafId = requestAnimationFrame(tick);
-    }
-    tick();
-  }
-  function resetVu(){ bars.forEach(b=>{ b.style.height='15%'; b.style.background='var(--lcd-dim)'; }); }
-
-  // ---------- Código de ruta: se lee y se sincroniza solo desde Supabase ----------
-  async function fetchCurrentCode(){
-    if(!supabaseClient) return 'RUTA18';
-    try{
-      const { data, error } = await supabaseClient.from('walkie_settings').select('code').eq('id', 1).single();
-      if(error || !data) return 'RUTA18';
-      return normalizeCode(data.code) || 'RUTA18';
-    }catch(e){ return 'RUTA18'; }
-  }
-
-  async function updateCodeInDB(newCode){
-    if(!supabaseClient) return false;
-    const { error } = await supabaseClient
-      .from('walkie_settings')
-      .update({ code: newCode, updated_at: new Date().toISOString(), updated_by: myName })
-      .eq('id', 1);
-    if(error){ log('No se pudo guardar el nuevo código en Supabase.'); return false; }
-    return true;
-  }
-
-  function subscribeToCodeChanges(onChange){
-    if(!supabaseClient) return;
-    supabaseClient
-      .channel('walkie-settings-widget-channel')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'walkie_settings' }, (payload) => {
-        const newCode = normalizeCode(payload.new && payload.new.code);
-        if(newCode) onChange(newCode);
-      })
-      .subscribe();
-  }
-
-  // ---------- Micrófono ----------
-  // mono + 16kHz: de sobra para voz clara, y le baja bastante el trabajo
-  // de codificar audio (menos CPU/batería) comparado con capturar en
-  // estéreo a 48kHz como hace el navegador por default.
   const micReady = new Promise((resolve) => {
     navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-        sampleRate: 16000,
-      }
-    })
-      .then(stream => {
-        localStream = stream;
-        localStream.getAudioTracks().forEach(t => t.enabled = false);
-        setStatus('Listo — conectando…', true);
-        log('Micrófono listo.');
-        resolve(true);
-      })
-      .catch(err => {
-        setStatus('Sin acceso al micrófono', false);
-        log('Error de micrófono: ' + err.message);
-        resolve(false);
-      });
+      audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:16000 }
+    }).then(stream => {
+      localStream = stream;
+      localStream.getAudioTracks().forEach(t => t.enabled = false);
+      log('Micrófono listo.');
+      resolve(true);
+    }).catch(err => {
+      setStatus('Sin acceso al micrófono', 'warn');
+      log('Error de micrófono: ' + err.message);
+      resolve(false);
+    });
   });
 
-  // ---------- Límite de bitrate de audio saliente ----------
-  // Por default, el navegador manda el audio de la llamada a bastante más
-  // bitrate del que hace falta para voz (puede irse hasta 32-64 kbps).
-  // Para radio no se necesita eso — con ~20 kbps mono se oye clarísimo y
-  // se manda mucho menos por los datos móviles, además de ahorrar CPU
-  // (menos trabajo de codificar = menos calor/batería). Se aplica a
-  // cualquier conexión de audio, sea la del dueño hacia cada pasajero o
-  // la del conductor/checador hacia el dueño.
-  function limitarBitrateSaliente(peerConnection, maxKbps = 20) {
-    if (!peerConnection || typeof peerConnection.getSenders !== 'function') return;
-    peerConnection.getSenders()
-      .filter((s) => s.track && s.track.kind === 'audio')
-      .forEach((sender) => {
-        try {
-          const params = sender.getParameters();
-          if (!params.encodings || !params.encodings.length) params.encodings = [{}];
-          params.encodings[0].maxBitrate = maxKbps * 1000;
-          sender.setParameters(params).catch(() => {});
-        } catch (e) { /* algunos navegadores viejos no soportan setParameters aquí; no pasa nada */ }
-      });
+  function limitarBitrateSaliente(pc, maxKbps = 20){
+    if(!pc || typeof pc.getSenders !== 'function') return;
+    pc.getSenders().filter(s => s.track && s.track.kind === 'audio').forEach(sender => {
+      try{
+        const params = sender.getParameters();
+        if(!params.encodings || !params.encodings.length) params.encodings = [{}];
+        params.encodings[0].maxBitrate = maxKbps * 1000;
+        sender.setParameters(params).catch(()=>{});
+      }catch(e){}
+    });
   }
 
-  // ================= DUEÑO DE RUTA (admin) =================
-  function startAdmin(rawCode){
-    if(!localStream){ log('El micrófono todavía no está listo.'); return; }
-    const code = normalizeCode(rawCode);
-    if(code.length < 3){ log('El código de ruta debe tener al menos 3 caracteres.'); return; }
+  // ==========================================================================
+  // PASO 2: conectarse al canal — SIN roles de dueño/checador/chofer.
+  // El primero que llega toma el puesto de "host" (solo técnico, nadie lo
+  // nota); todos los demás se conectan a él. Si el host se cae, el
+  // siguiente en la fila reclama el puesto automáticamente.
+  // ==========================================================================
+  function hostId(code){ return 'wtp-host-' + code.toLowerCase(); }
 
-    // Si ya había un panel activo con otro código, lo cerramos primero.
-    if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
-    passengers.forEach((p) => { if(p.call) try{ p.call.close(); }catch(e){} if(p.dataConn) try{ p.dataConn.close(); }catch(e){} });
-    passengers.clear();
-
-    setStatus('Iniciando panel…', true);
-    const adminId = 'wt7admin-' + code.toLowerCase();
-    peer = new Peer(adminId, { config: { iceServers: ICE_SERVERS } });
+  function tryBecomeHost(code){
+    peer = new Peer(hostId(code), { config: { iceServers: ICE_SERVERS } });
+    myRole = 'host';
 
     peer.on('open', () => {
       routeCode = code;
-
-      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-      broadcastDest = audioCtx.createMediaStreamDestination();
-      adminMicGain = audioCtx.createGain(); adminMicGain.gain.value = 1;
-      const adminMicSource = audioCtx.createMediaStreamSource(localStream);
-      adminMicSource.connect(adminMicGain).connect(broadcastDest);
-
-      roomCodeDisplay.textContent = code;
-      adminCodeInput.value = code;
-      peerStateEl.textContent = 'PANEL ACTIVO';
-      screenLabel.textContent = 'RUTA';
-      setStatus('Panel activo — esperando conexiones', true);
-      log('Panel del dueño activo para "' + code + '".');
-
-      leaveRow.style.display = 'none'; // el dueño no "sale", su panel siempre está activo
-      clipboard.classList.add('show');
-      renderRoster();
+      codeDisplay.textContent = code;
+      peerStateEl.textContent = 'CONECTADO (punto central)';
+      setStatus('Canal activo — esperando a los demás', true);
+      log('Tomaste el puesto de conexión central del canal.');
     });
 
     peer.on('call', call => {
-      const meta = call.metadata || {};
-      const name = meta.name ? String(meta.name).slice(0,20) : 'Sin nombre';
-      const joinRole = meta.role === 'checker' ? 'checker' : 'passenger';
-      const pid = call.peer;
-      call.answer(broadcastDest.stream);
+      const name = (call.metadata && call.metadata.name) || 'Alguien';
+      call.answer(localStream);
       limitarBitrateSaliente(call.peerConnection);
       call.on('stream', remoteStream => {
-        let audioEl = document.createElement('audio');
+        const audioEl = document.createElement('audio');
         audioEl.autoplay = true; audioEl.playsInline = true;
         audioContainer.appendChild(audioEl);
         audioEl.srcObject = remoteStream;
-
-        const src = audioCtx.createMediaStreamSource(remoteStream);
-        const gain = audioCtx.createGain(); gain.gain.value = 1;
-        src.connect(gain).connect(broadcastDest);
-
-        const existing = passengers.get(pid) || {};
-        existing.name = existing.name || name;
-        existing.role = existing.role || joinRole;
-        existing.call = call; existing.audioEl = audioEl;
-        existing.sourceNode = src; existing.gainNode = gain;
-        existing.muted = existing.muted || false;
-        passengers.set(pid, existing);
-        renderRoster();
-        log(existing.name + ' (' + (existing.role==='checker'?'checador':'conductor') + ') se unió a la ruta.');
-
-        try{
-          const an = audioCtx.createAnalyser(); an.fftSize = 32;
-          src.connect(an);
-          const buf = new Uint8Array(an.frequencyBinCount);
-          existing.speakingCheck = setInterval(() => {
-            an.getByteFrequencyData(buf);
-            let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i];
-            const p = passengers.get(pid);
-            if(p){ p.speaking = (sum/buf.length) > 12; renderRoster(); }
-          }, 350);
-        }catch(e){}
+        peers.set(call.peer, { call, audioEl });
+        log(name + ' se unió al canal.');
+        // Reenvía lo que llega de este chofer a todos los demás conectados
+        // (broadcast real: así aunque tú, el host, no hables, los demás sí
+        // se oyen entre sí a través tuyo).
+        rebroadcast(call.peer, remoteStream);
       });
-      call.on('close', () => removePassenger(pid));
-      call.on('error', () => removePassenger(pid));
-
-      const preset = passengers.get(pid) || {};
-      preset.name = preset.name || name;
-      preset.role = preset.role || joinRole;
-      preset.muted = preset.muted || false;
-      passengers.set(pid, preset);
-      renderRoster();
-    });
-
-    peer.on('connection', conn => {
-      const pid = conn.peer;
-      conn.on('open', () => {
-        const p = passengers.get(pid) || {};
-        p.dataConn = conn;
-        passengers.set(pid, p);
-        if(p.muted) conn.send({ type: 'muted' });
-        broadcastRosterToCheckers();
-      });
-      conn.on('data', msg => {
-        if(msg && msg.type === 'name'){
-          const p = passengers.get(pid) || {};
-          p.name = String(msg.name || 'Sin nombre').slice(0,20);
-          if(msg.role === 'checker') p.role = 'checker';
-          passengers.set(pid, p);
-          renderRoster();
-        }
-      });
+      call.on('close', () => { peers.delete(call.peer); log(name + ' salió del canal.'); });
     });
 
     peer.on('error', err => {
-      const messages = {
-        'unavailable-id': 'Ya hay un panel activo para este código de ruta.',
-        'network': 'Sin conexión al servidor. Revisa tu internet.'
-      };
-      log('Error: ' + (messages[err.type] || err.type));
-      setStatus('No se pudo iniciar el panel', false);
-    });
-  }
-
-  function removePassenger(pid){
-    const p = passengers.get(pid);
-    if(p){
-      if(p.audioEl){ p.audioEl.srcObject = null; p.audioEl.remove(); }
-      if(p.sourceNode){ try{ p.sourceNode.disconnect(); }catch(e){} }
-      if(p.gainNode){ try{ p.gainNode.disconnect(); }catch(e){} }
-      if(p.speakingCheck){ clearInterval(p.speakingCheck); }
-      log((p.name || 'Alguien') + ' salió de la ruta.');
-    }
-    passengers.delete(pid);
-    renderRoster();
-  }
-
-  function toggleMute(pid){
-    const p = passengers.get(pid);
-    if(!p) return;
-    p.muted = !p.muted;
-    if(p.gainNode) p.gainNode.gain.value = p.muted ? 0 : 1;
-    if(p.dataConn && p.dataConn.open) p.dataConn.send({ type: p.muted ? 'muted' : 'unmuted' });
-    log((p.muted ? 'Silenciaste a ' : 'Reactivaste a ') + (p.name || 'alguien') + '.');
-    renderRoster();
-  }
-
-  function kickPassenger(pid){
-    const p = passengers.get(pid);
-    if(!p) return;
-    if(p.dataConn && p.dataConn.open){ try{ p.dataConn.send({ type: 'kicked' }); }catch(e){} }
-    log('Expulsaste a ' + (p.name || 'alguien') + '.');
-    setTimeout(() => {
-      if(p.call){ try{ p.call.close(); }catch(e){} }
-      if(p.dataConn){ try{ p.dataConn.close(); }catch(e){} }
-      removePassenger(pid);
-    }, 250);
-  }
-
-  function renderRoster(){
-    if(role !== 'admin') return;
-    rosterSub.textContent = passengers.size + ' conectado' + (passengers.size===1?'':'s');
-    rosterList.innerHTML = '';
-    if(passengers.size === 0){
-      rosterList.innerHTML = '<li class="empty-roster">Nadie se ha unido todavía.</li>';
-    } else {
-      passengers.forEach((p, pid) => {
-        const li = document.createElement('li');
-        const dot = document.createElement('span');
-        dot.className = 'mic-dot' + (p.speaking ? ' speaking' : '');
-        const nameWrap = document.createElement('div');
-        nameWrap.className = 'name';
-        nameWrap.textContent = p.name || 'Sin nombre';
-        const tag = document.createElement('span');
-        tag.className = 'tag';
-        tag.textContent = (p.role==='checker' ? 'Checador' : 'Conductor') + ' · ' + (p.muted ? 'Silenciado' : 'En línea');
-        nameWrap.appendChild(tag);
-        const muteBtn = document.createElement('button');
-        muteBtn.className = 'btn-mute' + (p.muted ? ' muted' : '');
-        muteBtn.textContent = p.muted ? 'REACTIVAR' : 'SILENCIAR';
-        muteBtn.addEventListener('click', () => toggleMute(pid));
-        const kickBtn = document.createElement('button');
-        kickBtn.className = 'btn-kick';
-        kickBtn.textContent = 'EXPULSAR';
-        kickBtn.addEventListener('click', () => {
-          if(confirm('¿Expulsar a ' + (p.name || 'esta persona') + ' de la ruta?')) kickPassenger(pid);
-        });
-        li.appendChild(dot); li.appendChild(nameWrap); li.appendChild(muteBtn); li.appendChild(kickBtn);
-        rosterList.appendChild(li);
-      });
-    }
-    broadcastRosterToCheckers();
-  }
-
-  function broadcastRosterToCheckers(){
-    if(role !== 'admin') return;
-    const list = [...passengers.values()].map(p => ({ name: p.name || 'Sin nombre', role: p.role, muted: !!p.muted, speaking: !!p.speaking }));
-    passengers.forEach(p => {
-      if(p.role === 'checker' && p.dataConn && p.dataConn.open){
-        try{ p.dataConn.send({ type: 'roster', list }); }catch(e){}
+      if(err.type === 'unavailable-id'){
+        // Ya hay un host — me conecto como cliente normal.
+        log('Ya hay alguien como punto central, conectándome a él…');
+        if(peer) { try{ peer.destroy(); }catch(e){} }
+        joinAsClient(code);
+      } else {
+        log('Error: ' + err.type);
+        setStatus('Reintentando…', 'warn');
+        scheduleRetry(code);
       }
     });
   }
 
-  // ================= CHECADOR / CONDUCTOR (roles que escuchan y hablan) =================
-  function joinRoom(code, asRole){
-    if(!localStream){ log('El micrófono todavía no está listo.'); return; }
-    setStatus('Conectando con la ruta…', true);
+  // Reenvía el audio de cada chofer a todos los demás conectados al host,
+  // para que sea un canal grupal real y no solo "host habla con cada uno".
+  let audioCtxHost;
+  const broadcastGains = new Map();
+  function rebroadcast(fromPeerId, stream){
+    audioCtxHost = audioCtxHost || new (window.AudioContext||window.webkitAudioContext)();
+    const src = audioCtxHost.createMediaStreamSource(stream);
+    const dest = audioCtxHost.createMediaStreamDestination();
+    src.connect(dest);
+    broadcastGains.set(fromPeerId, dest);
+    peers.forEach((p, pid) => {
+      if(pid !== fromPeerId && p.call && p.call.peerConnection){
+        dest.stream.getAudioTracks().forEach(track => {
+          try{ p.call.peerConnection.addTrack(track, dest.stream); }catch(e){}
+        });
+      }
+    });
+  }
 
-    const prefix = asRole === 'checker' ? 'wt7c-' : 'wt7p-';
-    const myId = prefix + code.toLowerCase() + '-' + Math.random().toString(36).slice(2,8);
+  function joinAsClient(code){
+    myRole = 'client';
+    const myId = 'wtp-' + code.toLowerCase() + '-' + Math.random().toString(36).slice(2,8);
     peer = new Peer(myId, { config: { iceServers: ICE_SERVERS } });
 
     peer.on('open', () => {
       routeCode = code;
-      const adminId = 'wt7admin-' + code.toLowerCase();
-
-      adminCall = peer.call(adminId, localStream, { metadata: { name: myName, role: asRole } });
-      limitarBitrateSaliente(adminCall.peerConnection);
-      adminDataConn = peer.connect(adminId);
-
-      adminDataConn.on('open', () => adminDataConn.send({ type: 'name', name: myName, role: asRole }));
-      adminDataConn.on('data', msg => {
-        if(!msg) return;
-        if(msg.type === 'muted'){ mutedByAdmin = true; updateMuteUI(); log('El dueño te silenció.'); }
-        if(msg.type === 'unmuted'){ mutedByAdmin = false; updateMuteUI(); log('El dueño te reactivó.'); }
-        if(msg.type === 'kicked'){ log('Fuiste expulsado de la ruta por el dueño.'); setStatus('Expulsado de la ruta', 'warn'); }
-        if(msg.type === 'roster' && asRole === 'checker'){ renderCheckerRoster(msg.list); }
-      });
-
-      adminCall.on('stream', remoteStream => {
-        remoteAudioEl = document.createElement('audio');
-        remoteAudioEl.autoplay = true; remoteAudioEl.playsInline = true;
-        audioContainer.appendChild(remoteAudioEl);
-        remoteAudioEl.srcObject = remoteStream;
-        roomCodeDisplay.textContent = code;
+      codeDisplay.textContent = code;
+      hostCall = peer.call(hostId(code), localStream, { metadata: { name: myName } });
+      limitarBitrateSaliente(hostCall.peerConnection);
+      hostCall.on('stream', remoteStream => {
+        hostAudioEl = document.createElement('audio');
+        hostAudioEl.autoplay = true; hostAudioEl.playsInline = true;
+        audioContainer.appendChild(hostAudioEl);
+        hostAudioEl.srcObject = remoteStream;
         peerStateEl.textContent = 'CONECTADO';
         setStatus('En espera — mantén pulsado para hablar', true);
-        log('Conectado a la ruta "' + code + '".');
+        log('Conectado al canal "' + code + '".');
       });
-      adminCall.on('close', () => {
-        log('El dueño cerró la ruta. Buscándolo de nuevo…');
-        setStatus('Reconectando con el dueño…', 'warn');
+      hostCall.on('close', () => {
+        log('Se perdió la conexión con el punto central. Reintentando…');
+        setStatus('Reconectando…', 'warn');
         peerStateEl.textContent = 'RECONECTANDO';
-        scheduleAdminReconnect(code, asRole);
+        attemptTakeover(code);
       });
-      adminCall.on('error', () => log('Error en la conexión de audio.'));
-
-      screenLabel.textContent = 'RUTA';
-      if(asRole === 'checker') checkerClipboard.classList.add('show');
     });
 
     peer.on('error', err => {
-      const messages = {
-        'peer-unavailable': 'El dueño todavía no ha abierto su radio. En cuanto la abra te conectas solo.',
-        'network': 'Sin conexión al servidor. Revisa tu internet.'
-      };
-      log('Error: ' + (messages[err.type] || err.type));
-      setStatus('Esperando al dueño…', 'warn');
-      peerStateEl.textContent = 'RECONECTANDO';
-      // Reintenta solo en unos segundos — el dueño puede abrir su radio después.
-      scheduleAdminReconnect(code, asRole);
+      log('Error: ' + err.type + '. Reintentando…');
+      setStatus('Reconectando…', 'warn');
+      scheduleRetry(code);
     });
   }
 
-  // ---------- Reintento automático hacia el dueño (checador/conductor) ----------
-  // Cubre dos casos: el dueño todavía no abre su radio, y el dueño se cayó
-  // (recargó su panel, perdió internet, etc.) después de ya estar conectados.
-  let adminReconnectTimer = null;
-  function scheduleAdminReconnect(code, asRole){
-    if(adminReconnectTimer) return; // ya hay un reintento programado, no dupliques
-    routeCode = null;
-    adminReconnectTimer = setTimeout(() => {
-      adminReconnectTimer = null;
-      if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
-      if(remoteAudioEl){ remoteAudioEl.remove(); remoteAudioEl = null; }
-      joinRoom(code, asRole);
-    }, 5000);
-  }
-
-  function renderCheckerRoster(list){
-    checkerRosterSub.textContent = list.length + ' conectado' + (list.length===1?'':'s');
-    checkerRosterList.innerHTML = '';
-    if(list.length === 0){
-      checkerRosterList.innerHTML = '<li class="empty-roster">Nadie se ha unido todavía.</li>';
-      return;
-    }
-    list.forEach(p => {
-      const li = document.createElement('li');
-      const dot = document.createElement('span');
-      dot.className = 'mic-dot' + (p.speaking ? ' speaking' : '');
-      const nameWrap = document.createElement('div');
-      nameWrap.className = 'name';
-      nameWrap.textContent = p.name;
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = (p.role==='checker' ? 'Checador' : 'Conductor') + ' · ' + (p.muted ? 'Silenciado' : 'En línea');
-      nameWrap.appendChild(tag);
-      li.appendChild(dot); li.appendChild(nameWrap);
-      checkerRosterList.appendChild(li);
-    });
-  }
-
-  function updateMuteUI(){
-    pttBtn.classList.toggle('locked', mutedByAdmin);
-    pttLabel.innerHTML = mutedByAdmin ? 'SILENCIADO<br>POR EL<br>DUEÑO' : 'PULSAR<br>PARA<br>HABLAR';
-    pttHint.textContent = mutedByAdmin ? 'El dueño te silenció' : 'Mantén presionado el botón mientras hablas';
-  }
-
-  // ---------- Reconexión automática cuando el dueño cambia el código ----------
-  async function reconnectWithNewCode(newCode){
-    log('El dueño cambió el código de ruta. Reconectando…');
-    if(adminReconnectTimer){ clearTimeout(adminReconnectTimer); adminReconnectTimer = null; }
+  // Si el host se cae, cualquier cliente puede intentar tomar su lugar.
+  // Como todos corren la misma función al mismo tiempo, PeerJS solo deja
+  // que UNO gane el ID fijo — los demás automáticamente vuelven a caer en
+  // "conectarme como cliente" apenas ese uno gane.
+  function attemptTakeover(code){
     if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
-    if(remoteAudioEl){ remoteAudioEl.remove(); remoteAudioEl = null; }
-    routeCode = null;
-    roomCodeDisplay.textContent = '— — — — —';
-    peerStateEl.textContent = 'SIN CONECTAR';
-    if(role === 'admin'){
-      startAdmin(newCode);
-    } else {
-      joinRoom(newCode, role);
-    }
+    if(hostAudioEl){ hostAudioEl.remove(); hostAudioEl = null; }
+    setTimeout(() => tryBecomeHost(code), 400 + Math.random()*600); // pequeño azar para no chocar todos a la vez
   }
 
-  // ---------- PTT (hablar) ----------
+  function scheduleRetry(code){
+    if(hostRetryTimer) return;
+    hostRetryTimer = setTimeout(() => {
+      hostRetryTimer = null;
+      if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
+      joinAsClient(code);
+    }, 4000);
+  }
+
+  // ==========================================================================
+  // PTT
+  // ==========================================================================
   function setTx(on){
     if(!localStream) return;
-    if(role !== 'admin' && mutedByAdmin && on){ log('No puedes hablar: el dueño te silenció.'); return; }
     localStream.getAudioTracks().forEach(t => t.enabled = on);
     pttBtn.classList.toggle('pressed', on);
-    if(role !== 'admin' && remoteAudioEl){ remoteAudioEl.muted = on; }
-    if(on){
-      setStatus('TRANSMITIENDO', 'tx');
-      beep(880, 0.08);
-      startVuMeter(localStream);
-    } else {
-      setStatus(routeCode ? 'En espera — mantén pulsado para hablar' : 'Conectando…', true);
-      beep(520, 0.08);
-      if(rafId) cancelAnimationFrame(rafId);
-      resetVu();
-    }
+    if(myRole === 'client' && hostAudioEl) hostAudioEl.muted = on;
+    setStatus(on ? 'TRANSMITIENDO' : (routeCode ? 'En espera — mantén pulsado para hablar' : 'Conectando…'), on ? 'tx' : true);
   }
-
   pttBtn.addEventListener('pointerdown', e => { e.preventDefault(); pttBtn.setPointerCapture(e.pointerId); setTx(true); });
   pttBtn.addEventListener('pointerup', () => setTx(false));
   pttBtn.addEventListener('pointercancel', () => setTx(false));
-
-  // Seguro: si el cel se bloquea o la app pasa a segundo plano justo
-  // mientras tenías el botón apretado, el navegador a veces nunca manda el
-  // "soltaste" — y te quedas mudo para siempre (transmitiendo sin querer y
-  // sin poder oír a los demás). Esto suelta el botón solo en cuanto la
-  // pantalla se apaga o cambias de app, como si lo hubieras soltado a mano.
+  pttBtn.addEventListener('pointerleave', e => { if(e.buttons === 1) setTx(false); });
   document.addEventListener('visibilitychange', () => { if(document.hidden) setTx(false); });
   window.addEventListener('blur', () => setTx(false));
-  window.addEventListener('pagehide', () => setTx(false));
 
-  // Respaldo extra: si por lo que sea el botón no está presionado pero el
-  // audio que escuchas se quedó muteado (o al revés), lo corrige solo cada
-  // pocos segundos.
-  setInterval(() => {
-    const presionado = pttBtn.classList.contains('pressed');
-    if(role !== 'admin' && remoteAudioEl && remoteAudioEl.muted !== presionado){
-      remoteAudioEl.muted = presionado;
-    }
-  }, 4000);
-
-  // API para que la página que lo embebe (checador/conductor/dueño) controle
-  // "hablar" directo con un botón propio, sin tener que abrir este panel.
+  // ==========================================================================
+  // API para el botón "HABLAR" del panel del conductor (fuera del iframe)
+  // ==========================================================================
   window.RSSWalkie = {
     setTx,
     getStatus(){
-      return {
-        connected: !!routeCode,
-        muted: mutedByAdmin,
-        pressed: pttBtn.classList.contains('pressed'),
-        peerState: peerStateEl ? peerStateEl.textContent : ''
-      };
+      return { connected: !!routeCode, pressed: pttBtn.classList.contains('pressed'), peerState: peerStateEl.textContent };
     }
   };
-  pttBtn.addEventListener('pointerleave', e => { if(e.buttons === 1) setTx(false); });
-  window.addEventListener('keydown', e => {
-    if(e.code === 'Space' && !e.repeat && !['INPUT'].includes(document.activeElement.tagName)){ e.preventDefault(); setTx(true); }
-  });
-  window.addEventListener('keyup', e => { if(e.code === 'Space') setTx(false); });
 
-  // ---------- Cambiar código (solo dueño) ----------
-  toggleChangeCodeBtn.addEventListener('click', () => {
-    adminNewCodeField.style.display = 'block';
-    adminNewCodeInput.value = '';
-    adminNewCodeInput.focus();
-    toggleChangeCodeBtn.style.display = 'none';
-    confirmChangeCodeBtn.style.display = 'block';
-  });
-  adminNewCodeInput.addEventListener('input', () => { adminNewCodeInput.value = normalizeCode(adminNewCodeInput.value); });
-  confirmChangeCodeBtn.addEventListener('click', async () => {
-    const newCode = normalizeCode(adminNewCodeInput.value);
-    if(newCode.length < 3){ log('Escribe un código de al menos 3 caracteres.'); return; }
-    confirmChangeCodeBtn.disabled = true;
-    const ok = await updateCodeInDB(newCode);
-    confirmChangeCodeBtn.disabled = false;
-    if(ok){
-      log('Código actualizado a "' + newCode + '". Checador y conductores se reconectan solos.');
-      adminNewCodeField.style.display = 'none';
-      toggleChangeCodeBtn.style.display = 'block';
-      confirmChangeCodeBtn.style.display = 'none';
-      startAdmin(newCode); // el propio panel del dueño también se reconecta con el nuevo código
-    }
-  });
-
-  // ================= Arranque =================
+  // ==========================================================================
+  // Arranque — nombre y ruta llegan por la URL del iframe:
+  //   walkie-widget.html?name=Juan%20Perez&route=r18-san-simon
+  // El botón HABLAR del panel arma esa URL, el chofer nunca la ve ni la toca.
+  // ==========================================================================
   await micReady;
-  const initialCode = await fetchCurrentCode();
-  routeCode = null; // se define de verdad hasta que el peer abre conexión
-  roomCodeDisplay.textContent = initialCode;
+  const params = new URLSearchParams(window.location.search);
+  myName = (params.get('name') || 'Chofer').slice(0, 20);
+  const routeId = params.get('route') || CONFIG.ROUTE_ID;
+  document.getElementById('brandName').textContent = 'RUTA · ' + myName;
 
-  if(role === 'admin'){
-    adminCodeInput.value = initialCode;
-    startAdmin(initialCode);
-  } else {
-    joinRoom(initialCode, role);
-  }
+  setStatus('Buscando el canal…', true);
+  const code = await fetchChannelCode(routeId);
+  if(!code){ setStatus('No se pudo obtener el código del canal', 'warn'); log('Revisa la configuración de Supabase.'); return; }
 
-  subscribeToCodeChanges((newCode) => {
-    if(newCode && newCode !== (routeCode || initialCode)) reconnectWithNewCode(newCode);
-  });
+  tryBecomeHost(code);
 })();
 </script>
 
