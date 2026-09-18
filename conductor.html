@@ -1205,13 +1205,9 @@
   })();
 </script>
 
-<!-- Justo ARRIBA del <button id="walkiePttBtn"...> que ya tienes -->
-<div id="walkieSpeaking" style="
-  position:fixed; left:16px; bottom:84px; z-index:45;
-  font-size:11px; font-weight:700; color:#fff; background:rgba(0,0,0,.55);
-  padding:4px 10px; border-radius:999px; display:none; white-space:nowrap;
-">🔊 Hablando: <span id="walkieSpeakingName"></span></div>
-<!-- ===== WALKIE-TALKIE — botón de hablar, sin panel que abrir ===== -->
+
+<div id="walkieSpeaking" style="position:fixed; left:16px; bottom:84px; z-index:45; font-size:11px; font-weight:700; color:#fff; background:rgba(0,0,0,.55); padding:4px 10px; border-radius:999px; display:none; white-space:nowrap;">🔊 Hablando:
+   <span id="walkieSpeakingName"></span></div>
 <button id="walkiePttBtn" aria-label="Hablar por radio" style="
   position:fixed; left:16px; bottom:16px; z-index:45;
   width:64px; height:64px; border-radius:999px; border:none;
@@ -1280,20 +1276,7 @@
   btn.addEventListener('pointercancel', endPress);
   btn.addEventListener('pointerleave', function(e){ if(e.buttons === 1) endPress(); });
 
-  setInterval(function(){
-  var a = api();
-  var status = a ? a.getStatus() : null;
-  btn.style.opacity = (status && status.connected) ? '1' : '.6';
-
-  var speakingEl = document.getElementById('walkieSpeaking');
-  var speakingName = document.getElementById('walkieSpeakingName');
-  if(status && status.speakerName){
-    speakingName.textContent = status.speakerName;
-    speakingEl.style.display = 'block';
-  } else {
-    speakingEl.style.display = 'none';
-  }
-}, 1000);
+  setInterval(function(){ var a = api(); var status = a ? a.getStatus() : null; btn.style.opacity = (status && status.connected) ? '1' : '.6'; var speakingEl = document.getElementById('walkieSpeaking'); var speakingName = document.getElementById('walkieSpeakingName'); if(status && status.speakerName){ speakingName.textContent = status.speakerName; speakingEl.style.display = 'block'; } else { speakingEl.style.display = 'none'; } }, 1000);
 </script>
 
 <iframe id="walkieFrame" title="Radio de la ruta" tabindex="-1" style="
