@@ -20,22 +20,15 @@ function formatHora(m) {
 }
 function ramalNombre(r) { return r === 'capilla' ? 'Por Capilla' : 'Por Secundaria'; }
 function ramalColorVar(r) { return r === 'capilla' ? 'var(--cempasuchil)' : 'var(--agave)'; }
-
-// "Día operativo": igual que en horarios-logic.js, la fecha no cambia justo
-// a medianoche sino hasta las 5:00am, que es cuando de verdad arranca el
-// servicio. Antes esto solo vivía en horarios-logic.js, así que al
-// checador ya no le rotaba el rollo a medianoche pero al conductor sí
-// (aquí se calculaba la fecha "cruda"). Con esto quedan sincronizados.
-function diaOperativoDate() {
+// "Día operativo": igual que en el panel del checador, la fecha no cambia
+// justo a medianoche sino hasta las 5:00am (cuando arranca el servicio) —
+// así lo que el checador programa para "mañana" le aparece al conductor
+// exactamente a esa hora, no desde las 12:00am.
+function todayStr() {
   const d = new Date();
   if (d.getHours() < 5) d.setDate(d.getDate() - 1);
-  return d;
-}
-function fechaStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
-function todayStr() { return fechaStr(diaOperativoDate()); }
-
 function nowMin() {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
@@ -222,26 +215,8 @@ async function loadYRender(driverId) {
   if (sheetAbierta) renderHoja(ultimasCorridas);
 }
 
-// Recuerda qué "fecha operativa" traía cargada, para detectar cuando dan
-// las 5am y hay que recargar aunque el realtime no haya disparado nada
-// (si nadie tocó la tabla de "corridas" entre 12am y 5am, no llega ningún
-// evento de postgres_changes que nos avise que ya es "otro día").
-let driverIdActivo = null;
-let fechaCargada = null;
-
-async function checkRolloverYRefrescar() {
-  if (!driverIdActivo) return;
-  const actual = todayStr();
-  if (fechaCargada && fechaCargada !== actual) {
-    fechaCargada = actual;
-    await loadYRender(driverIdActivo);
-  }
-}
-
 export function initTarjetaConductor(driverId) {
   if (!driverId) return;
-  driverIdActivo = driverId;
-  fechaCargada = todayStr();
   ensureTarjetaMount();
   loadYRender(driverId);
   if (tarjetaChannel) supabase.removeChannel(tarjetaChannel);
@@ -256,8 +231,5 @@ export function initTarjetaConductor(driverId) {
   // tarde o temprano. 45s en vez de cada pocos segundos porque esto es
   // nada más un respaldo (el tiempo real ya avisa al instante) y así no
   // gasta datos de más a lo tonto durante todo el turno.
-  setInterval(() => {
-    checkRolloverYRefrescar();
-    loadYRender(driverId);
-  }, 45000);
+  setInterval(() => loadYRender(driverId), 45000);
 }
