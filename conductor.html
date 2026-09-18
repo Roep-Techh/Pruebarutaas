@@ -1206,8 +1206,12 @@
 </script>
 
 
-<div id="walkieSpeaking" style="position:fixed; left:16px; bottom:84px; z-index:45; font-size:11px; font-weight:700; color:#fff; background:rgba(0,0,0,.55); padding:4px 10px; border-radius:999px; display:none; white-space:nowrap;">🔊 Hablando:
-   <span id="walkieSpeakingName"></span></div>
+<div id="walkieSpeaking" style="
+  position:fixed; left:16px; bottom:84px; z-index:45;
+  font-size:11px; font-weight:700; color:#fff; background:rgba(0,0,0,.55);
+  padding:4px 10px; border-radius:999px; display:none; white-space:nowrap;
+">🔊 Hablando: <span id="walkieSpeakingName"></span></div>
+
 <button id="walkiePttBtn" aria-label="Hablar por radio" style="
   position:fixed; left:16px; bottom:16px; z-index:45;
   width:64px; height:64px; border-radius:999px; border:none;
@@ -1234,10 +1238,7 @@
   function loadFrame(){
     if(loaded) return;
     loaded = true;
-    // headerDriverName ya lo tienes puesto en tu panel con el nombre real del chofer
     var name = document.getElementById('headerDriverName').textContent.trim() || 'Chofer';
-    // 'r18-san-simon' es el ROUTE_ID de tu ruta — no es secreto, es el mismo
-    // identificador que ya usas en tu config.json
     frame.src = 'walkie-widget.html?name=' + encodeURIComponent(name) + '&route=r18-san-simon';
   }
   function unloadFrame(){
@@ -1247,7 +1248,7 @@
     frame.src = 'about:blank';
     btn.style.opacity = '.6';
   }
-  window.__rssWalkieStop = unloadFrame; // llámalo cuando el conductor apague su turno
+  window.__rssWalkieStop = unloadFrame;
 
   function api(){ try { return frame.contentWindow && frame.contentWindow.RSSWalkie; } catch(e){ return null; } }
   function startPress(){
@@ -1276,15 +1277,21 @@
   btn.addEventListener('pointercancel', endPress);
   btn.addEventListener('pointerleave', function(e){ if(e.buttons === 1) endPress(); });
 
-  setInterval(function(){ var a = api(); var status = a ? a.getStatus() : null; btn.style.opacity = (status && status.connected) ? '1' : '.6'; var speakingEl = document.getElementById('walkieSpeaking'); var speakingName = document.getElementById('walkieSpeakingName'); if(status && status.speakerName){ speakingName.textContent = status.speakerName; speakingEl.style.display = 'block'; } else { speakingEl.style.display = 'none'; } }, 1000);
+  setInterval(function(){
+    var a = api();
+    var status = a ? a.getStatus() : null;
+    btn.style.opacity = (status && status.connected) ? '1' : '.6';
+    var speakingEl = document.getElementById('walkieSpeaking');
+    var speakingName = document.getElementById('walkieSpeakingName');
+    if(status && status.speakerName){
+      speakingName.textContent = status.speakerName;
+      speakingEl.style.display = 'block';
+    } else {
+      speakingEl.style.display = 'none';
+    }
+  }, 1000);
+})();
 </script>
-
-<iframe id="walkieFrame" title="Radio de la ruta" tabindex="-1" style="
-  position:fixed; left:-9999px; top:-9999px; width:1px; height:1px; border:0; opacity:0; pointer-events:none;
-"></iframe>
-
-<script>
-
 
 </body>
 </html>
