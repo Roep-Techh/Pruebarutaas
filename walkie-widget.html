@@ -452,6 +452,13 @@
     pttBtn.classList.toggle('pressed', on);
     if(myRole === 'client' && hostAudioEl) hostAudioEl.muted = on;
     setStatus(on ? 'TRANSMITIENDO' : (routeCode ? 'En espera — mantén pulsado para hablar' : 'Conectando…'), on ? 'tx' : true);
+
+    updateSpeaker(myName, on);
+    if(myRole === 'host'){
+      broadcastSpeaking(null, myName, on); // avisa a todos los choferes conectados
+    } else if(myRole === 'client' && hostData && hostData.open){
+      try{ hostData.send({ type: 'speaking', name: myName, on }); }catch(e){}
+    }
   }
   pttBtn.addEventListener('pointerdown', e => { e.preventDefault(); pttBtn.setPointerCapture(e.pointerId); setTx(true); });
   pttBtn.addEventListener('pointerup', () => setTx(false));
@@ -466,7 +473,7 @@
   window.RSSWalkie = {
     setTx,
     getStatus(){
-      return { connected: !!routeCode, pressed: pttBtn.classList.contains('pressed'), peerState: peerStateEl.textContent };
+      return { connected: !!routeCode, pressed: pttBtn.classList.contains('pressed'), peerState: peerStateEl.textContent, speakerName: currentSpeaker };
     }
   };
 
