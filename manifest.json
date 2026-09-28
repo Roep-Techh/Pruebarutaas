@@ -1,7 +1,7 @@
 {
-  "name": "Ruta San Simón · San Simón - San Martín",
-  "short_name": "Ruta San Simón",
-  "description": "Horarios, frecuencia y mapa en vivo de la ruta de combis San Simón - San Martín Texmelucan.",
+  "name": "Ruta Mirador · Mirador - Nueva Esperanza",
+  "short_name": "Ruta Mirador",
+  "description": "Horarios, frecuencia y mapa en vivo de la ruta de combis Mirador - Nueva Esperanza.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
