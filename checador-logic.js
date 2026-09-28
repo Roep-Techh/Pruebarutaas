@@ -396,7 +396,7 @@ on(incidentNoPresentoBtn, 'click', () => {
 // ----- MAPA (Leaflet) -----
 function initMap() {
   if (mapInitialized) return;
-  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([19.272, -98.455], 13);
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([20.316058, -99.802152], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
   L.control.attribution({ prefix: false })
     .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
@@ -1010,7 +1010,7 @@ async function downloadDaySummaryPdf() {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(14, 128, 190); // azul talavera
-  doc.text('Vueltas del día · Ruta San Simón (R-18)', 14, 18);
+  doc.text('Vueltas del día · Ruta Mirador (R-18)', 14, 18);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
