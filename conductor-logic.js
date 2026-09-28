@@ -100,8 +100,8 @@ function runOp(op) {
 //
 // IMPORTANTE: cada op lleva una "key" (ej. "route_event:driverId").
 // Antes de mandar o encolar, se quita de la cola cualquier op VIEJO
-// con la misma key. Así, si un reintento atrasado de "Salió de San
-// Simón" sigue esperando turno cuando ya diste "Llegué a San Martín",
+// con la misma key. Así, si un reintento atrasado de "Salió de
+// Mirador" sigue esperando turno cuando ya diste "Llegué a Nueva Esperanza",
 // el reintento viejo se cancela solo en vez de sobrescribir el dato
 // más nuevo cuando por fin le toque su turno.
 function opKey(op) {
@@ -513,10 +513,10 @@ document.querySelectorAll('.ramal-btn').forEach((btn) => {
 
 // ----- CHECKPOINTS (SALIÓ / LLEGÓ) -----
 const CHECKPOINTS = [
-  { key: 'salio_san_simon',  label: 'Salí de base San Simón' },
-  { key: 'llego_san_martin', label: 'Llegué a San Martín' },
-  { key: 'salio_san_martin', label: 'Salí de base San Martín' },
-  { key: 'llego_san_simon',  label: 'Llegué a San Simón' },
+  { key: 'salio_mirador',  label: 'Salí de base Mirador' },
+  { key: 'llego_nueva_esperanza', label: 'Llegué a Nueva Esperanza' },
+  { key: 'salio_nueva_esperanza', label: 'Salí de base Nueva Esperanza' },
+  { key: 'llego_mirador',  label: 'Llegué a Mirador' },
 ];
 
 let checkpointIdx = 0;
@@ -833,7 +833,7 @@ async function startSharingNative() {
   try {
     bgWatcherId = await BackgroundGeolocation.addWatcher(
       {
-        backgroundMessage: 'Ruta San Simón está compartiendo tu ubicación',
+        backgroundMessage: 'Ruta Mirador está compartiendo tu ubicación',
         backgroundTitle: 'Compartiendo ubicación',
         requestPermissions: true,
         stale: false,
