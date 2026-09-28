@@ -155,7 +155,7 @@ if (driverSearchInputMobile) driverSearchInputMobile.addEventListener('input', o
 function initMap() {
   if (mapInitialized) return; // Si ya existe, no hacer nada
 
-  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([19.272, -98.455], 13);
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([20.316058, -99.802152], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
   L.control.attribution({ prefix: false })
     .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
